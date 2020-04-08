@@ -57,7 +57,10 @@ class Bootstrap
 
     public function adminInit(): void
     {
+
         add_action('admin_menu', [$this, 'adminMenu']);
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueueAssets' ) );
+
     }
 
     /**
@@ -65,11 +68,12 @@ class Bootstrap
      */
     public function adminMenu(): void
     {
-        add_menu_page(
+
+        $menu = add_menu_page(
             __('SPM', 'novembit-spm'),
             __('SPM', 'novembit-spm'),
             'manage_options',
-            self::SLUG,
+            $this->getName(),
             [$this, 'adminContent'],
             'dashicons-admin-site-alt',
             75
@@ -106,4 +110,31 @@ class Bootstrap
         return $this->plugin_file;
     }
 
+    /**
+     * @return mixed
+     */
+    public function getPluginDirUrl()
+    {
+        return plugin_dir_url($this->getPluginFile());
+    }
+
+
+    /**
+     * @return mixed
+     */
+    public function getPluginBasename()
+    {
+        return plugin_basename($this->getPluginFile());
+    }
+
+    /**
+     *
+     */
+    public function enqueueAssets(): void
+    {
+        global $plugin_page;
+        if( strpos( $plugin_page, $this->getName() ) !== false ) {
+            wp_enqueue_style($this->getName(), $this->getPluginDirUrl() . '/assets/style/admin.css', null, '1.0.1');
+        }
+    }
 }

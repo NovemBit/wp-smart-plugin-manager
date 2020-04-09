@@ -1,16 +1,27 @@
-.smart-plugin-manager-plugins-wrap span.plugin-active-status-badge.deactivated:before{
-    background:red;
+.smart-plugin-manager-plugins-wrap span.plugin-active-status-badge.deactivated:before {
+    background: red;
 }
-.smart-plugin-manager-plugins-wrap span.plugin-active-status-badge.activated:before{
-    background:green;
+
+.smart-plugin-manager-plugins-wrap span.plugin-active-status-badge.activated:before {
+    background: green;
 }
+
 .smart-plugin-manager-plugins-wrap span.plugin-active-status-badge:before {
-    content:"";
-    width:10px;
-    height:10px;
-    background:#000;
-    display:inline-block;
-    border-radius:50%;
-    margin-right:5px;
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: #000;
+    display: inline-block;
+    border-radius: 50%;
+    margin-right: 5px;
     box-sizing: border-box;
+}
+
+.smart-plugin-manager-plugins-wrap .plugin-actions {
+    text-align: right;
+    margin: 0 10px 10px 0;
+}
+
+.smart-plugin-manager-plugins-wrap .plugin-actions > * {
+    vertical-align: middle;
 }

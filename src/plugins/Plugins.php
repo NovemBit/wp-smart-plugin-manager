@@ -85,7 +85,15 @@ class Plugins
                         'values' => $plugins,
                         'label' => 'Required plugins'
                     ]
-                )
+                ),
+                'depends' => new Option(
+                    [
+                        'default' => [],
+                        'method' => Option::METHOD_MULTIPLE,
+                        'values' => $plugins,
+                        'label' => 'Depends on plugins'
+                    ]
+                ),
             ];
         }
 
@@ -177,7 +185,7 @@ class Plugins
         <div class="plugin-actions">
 
             <a href="<?php echo $activate_url; ?>" class="button button-default">
-                <?php echo $this->getPluginActiveStatusBadge($plugin,false); ?>
+                <?php echo $this->getPluginActiveStatusBadge($plugin, false); ?>
                 <?php echo $label; ?>
             </a>
 

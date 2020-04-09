@@ -14,15 +14,32 @@ class Plugins
      * */
     public $parent;
 
+    /**
+     * @var array
+     * */
     private $settings;
 
+    /**
+     * @var $config
+     * */
+    private $config;
+
+    /**
+     * @var array
+     * */
     private $plugins;
 
-    public const STATUS_SYSTEM_DEFAULT = 0;
-    public const STATUS_FORCE_DISABLED = -1;
-    public const STATUS_FORCE_ENABLED = 1;
-    public const STATUS_SMART = 2;
+    /**
+     * Statuses
+     * */
+    public const STATUS_SYSTEM_DEFAULT = 'default';
+    public const STATUS_FORCE_DISABLED = 'force_disabled';
+    public const STATUS_FORCE_ENABLED = 'force_enabled';
+    public const STATUS_SMART = 'smart';
 
+    /**
+     * Actions
+     * */
     public const ACTION_PLUGIN_ACTIVATE = 'plugin_activate';
 
     /**
@@ -94,14 +111,110 @@ class Plugins
                         'label' => 'Depends on plugins'
                     ]
                 ),
+                'rules' => new Option(
+                    [
+                        'default' => [],
+                        'method' => Option::METHOD_MULTIPLE,
+                        'type' => Option::TYPE_GROUP,
+                        'values' => [],
+                        'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);'],
+                        'template' => [
+                            'rule' => [
+                                'type' => Option::TYPE_GROUP,
+                                'method' => Option::METHOD_MULTIPLE,
+                                'label' => 'Single Rule',
+                                'main_params' => ['style' => 'grid-template-columns: repeat(3, 1fr);display:grid'],
+                                'template' => [
+                                    'type' => [
+                                        'type' => Option::TYPE_TEXT,
+                                        'values' => [
+                                            'request' => 'Request',
+                                            'get' => 'Get',
+                                            'post' => 'Post'
+                                        ]
+                                    ],
+                                    'key' => [
+                                        'type' => Option::TYPE_TEXT,
+                                        'label' => 'Key',
+                                    ],
+                                    'value' => [
+                                        'type' => Option::TYPE_TEXT,
+                                        'label' => 'Value',
+                                    ],
+                                    'logic' => [
+                                        'type' => Option::TYPE_TEXT,
+                                        'label' => 'Logic',
+                                        'values' => [
+                                            'and' => 'And',
+                                            'or' => 'Or',
+                                            'not' => 'Not',
+                                        ]
+                                    ]
+                                ],
+                            ],
+                            'logic' => [
+                                'type' => Option::TYPE_TEXT,
+                                'label' => 'Logic',
+                                'values' => [
+                                    'and' => 'And',
+                                    'or' => 'Or',
+                                    'not' => 'Not',
+                                ]
+                            ]
+                        ],
+                        'label' => 'Rules'
+                    ]
+                ),
             ];
         }
+
+        $this->config = Option::expandOptions($this->settings,$this->getName());
+
+        $this->initPlugins();
 
         if (is_admin()) {
             $this->adminInit();
         }
     }
 
+    private function initPlugins(): void
+    {
+        if (!isset($_GET['j'])) {
+            return;
+        }
+
+        $active_plugins = [];
+
+        foreach ($this->getConfig() as $plugin => $data) {
+            if (!($this->plugins[$plugin]['custom_data']['is_active'] ?? false)) {
+                continue;
+            }
+
+            $status = $data['status'] ?? self::STATUS_SYSTEM_DEFAULT;
+
+            if($status === self::STATUS_FORCE_ENABLED){
+                $active_plugins[] = $plugin;
+                continue;
+            }
+
+            if($status === self::STATUS_FORCE_DISABLED){
+                continue;
+            }
+
+            $active_plugins[] = $plugin;
+        }
+
+        add_filter(
+            'option_active_plugins',
+            static function ($plugins) use ($active_plugins) {
+                return $active_plugins;
+            }
+        );
+    }
+
+    /**
+     * @return void
+     */
     public function handleRequestActions(): void
     {
         if (isset($_GET[$this->getName()])
@@ -120,10 +233,14 @@ class Plugins
         }
     }
 
+    /**
+     * Set All plugins
+     * @return void
+     */
     private function setAllPlugins(): void
     {
         $this->plugins = get_plugins();
-
+        unset($this->plugins[sprintf('%1$s/%1$s.php', $this->parent->getName())]);
         foreach ($this->plugins as $plugin => &$data) {
             $data['custom_data']['is_active'] = is_plugin_active($plugin);
         }
@@ -165,6 +282,10 @@ class Plugins
         return $content;
     }
 
+    /**
+     * @param string $plugin
+     * @return string
+     */
     private function getPluginActions(string $plugin): string
     {
         global $wp;
@@ -268,6 +389,9 @@ class Plugins
     }
 
 
+    /**
+     * @return array
+     */
     public function getPluginsMap(): array
     {
         $result = [];
@@ -288,5 +412,13 @@ class Plugins
         <h1>Smart Plugin Manager - Plugins</h1>
         <?php
         Option::printForm($this->getName(), $this->settings);
+    }
+
+    /**
+     * @return array
+     */
+    public function getConfig(): array
+    {
+        return $this->config;
     }
 }

@@ -19,7 +19,8 @@
     "ext-dom": "*",
     "ext-mbstring": "*",
     "ext-json": "*",
-    "diazoxide/wp-lib-option": "dev-master"
+    "diazoxide/wp-lib-option": "dev-master",
+    "diazoxide/php-helpers": "dev-master"
   },
   "require-dev": {
     "roave/security-advisories": "dev-master"

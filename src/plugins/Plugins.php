@@ -4,6 +4,8 @@
 namespace NovemBit\wp\plugins\spm\plugins;
 
 
+use diazoxide\helpers\Arrays;
+use diazoxide\helpers\Environment;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
 
@@ -82,6 +84,8 @@ class Plugins
                 10,
                 3
             );
+            $plugins_list = $plugins;
+            unset($plugins_list[$file]);
             $this->settings[$file] = [
                 'status' => new Option(
                     [
@@ -99,16 +103,8 @@ class Plugins
                     [
                         'default' => [],
                         'method' => Option::METHOD_MULTIPLE,
-                        'values' => $plugins,
+                        'values' => $plugins_list,
                         'label' => 'Required plugins'
-                    ]
-                ),
-                'depends' => new Option(
-                    [
-                        'default' => [],
-                        'method' => Option::METHOD_MULTIPLE,
-                        'values' => $plugins,
-                        'label' => 'Depends on plugins'
                     ]
                 ),
                 'rules' => new Option(
@@ -130,7 +126,9 @@ class Plugins
                                         'values' => [
                                             'request' => 'Request',
                                             'get' => 'Get',
-                                            'post' => 'Post'
+                                            'post' => 'Post',
+                                            'cookie' => 'Cookie',
+                                            'server' => 'Server'
                                         ]
                                     ],
                                     'key' => [
@@ -168,7 +166,7 @@ class Plugins
             ];
         }
 
-        $this->config = Option::expandOptions($this->settings,$this->getName());
+        $this->config = Option::expandOptions($this->settings, $this->getName());
 
         $this->initPlugins();
 
@@ -177,6 +175,14 @@ class Plugins
         }
     }
 
+    private function isPluginActive(string $plugin): bool
+    {
+        return $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
+    }
+
+    /**
+     * @return void
+     */
     private function initPlugins(): void
     {
         if (!isset($_GET['j'])) {
@@ -185,31 +191,97 @@ class Plugins
 
         $active_plugins = [];
 
-        foreach ($this->getConfig() as $plugin => $data) {
-            if (!($this->plugins[$plugin]['custom_data']['is_active'] ?? false)) {
+        $config = $this->getConfig();
+
+        foreach ($config as $plugin => &$data) {
+            if (!$this->isPluginActive($plugin)
+                || in_array($plugin, $active_plugins, true)
+            ) {
                 continue;
             }
 
             $status = $data['status'] ?? self::STATUS_SYSTEM_DEFAULT;
 
-            if($status === self::STATUS_FORCE_ENABLED){
+            if ($status === self::STATUS_FORCE_ENABLED) {
                 $active_plugins[] = $plugin;
                 continue;
             }
 
-            if($status === self::STATUS_FORCE_DISABLED){
+            if ($status === self::STATUS_FORCE_DISABLED) {
                 continue;
             }
 
+            if ($status === self::STATUS_SMART) {
+
+                $rules = array_values($data['rules'] ?? []);
+                $force_required = $data['force_required'] ?? false;
+
+                if ($force_required || $this->checkRules($rules)) {
+                    $required = $data['require'] ?? [];
+                    foreach ($required as $_plugin) {
+                        if (
+                            $_plugin !== $plugin
+                            && $this->isPluginActive($_plugin)
+                            && !in_array($_plugin, $active_plugins, true)
+                        ) {
+                            $_config = $config[$_plugin];
+                            $_config['force_required'] = true;
+                            unset($config[$_plugin]);
+                            $config[$_plugin] = $_config;
+                        }
+                    }
+                } else {
+                    continue;
+                }
+            }
             $active_plugins[] = $plugin;
         }
+        unset($data);
 
         add_filter(
             'option_active_plugins',
             static function ($plugins) use ($active_plugins) {
                 return $active_plugins;
-            }
+            },
+            PHP_INT_MAX - 10
         );
+    }
+
+    /**
+     * @param array $rules
+     * @return bool
+     */
+    private function checkRules(array $rules): bool
+    {
+        $status = null;
+
+        foreach ($rules as $_rules) {
+            $logic = $_rules['logic'] ?? 'and';
+
+            if (isset($_rules['rule'])) {
+                $assertion = $this->checkRules(array_values($_rules['rule']));
+            } else {
+                $type = $_rules['type'] ?? null;
+                $key = $_rules['key'] ?? null;
+                $value = $_rules['value'] ?? null;
+                if (!$type || !$key) {
+                    continue;
+                }
+                $assertion = $value === call_user_func([Environment::class, $type], $key);
+            }
+
+            if ($logic === 'and') {
+                $status = ($status ?? true) && $assertion;
+            }
+            if ($logic === 'or') {
+                $status = ($status ?? true) || $assertion;
+            }
+            if ($logic === 'not') {
+                $status = ($status ?? true) && !$assertion;
+            }
+        }
+
+        return $status ?? false;
     }
 
     /**
@@ -314,15 +386,6 @@ class Plugins
 
         <?php
         return ob_get_clean();
-    }
-
-    /**
-     * @param string $plugin
-     * @return bool
-     */
-    private function isPluginActive(string $plugin): bool
-    {
-        return $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
     }
 
     /**

@@ -32,6 +32,11 @@ class Plugins
     private $plugins;
 
     /**
+     * @var array
+     * */
+    private $orig_active_plugins;
+
+    /**
      * Statuses
      * */
     public const STATUS_SYSTEM_DEFAULT = 'default';
@@ -168,7 +173,7 @@ class Plugins
 
         $this->config = Option::expandOptions($this->settings, $this->getName());
 
-        $this->initPlugins();
+        $this->initActivePlugins();
 
         if (is_admin()) {
             $this->adminInit();
@@ -180,11 +185,28 @@ class Plugins
         return $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
     }
 
+    private function resetActivePlugins(): void
+    {
+        add_filter(
+            'option_active_plugins',
+            function ($plugins) {
+                return $this->orig_active_plugins;
+            },
+            PHP_INT_MAX - 9
+        );
+    }
+
     /**
      * @return void
      */
-    private function initPlugins(): void
+    private function initActivePlugins(): void
     {
+        $this->orig_active_plugins = get_option('active_plugins');
+
+        if (Environment::server('REQUEST_URI') === '/wp-admin/plugins.php') {
+            return;
+        }
+
         $active_plugins = [];
 
         $config = $this->getConfig();
@@ -208,7 +230,6 @@ class Plugins
             }
 
             if ($status === self::STATUS_SMART) {
-
                 $rules = array_values($data['rules'] ?? []);
                 $force_required = $data['force_required'] ?? false;
 
@@ -293,8 +314,9 @@ class Plugins
                 return;
             }
             $plugin = base64_decode($plugin);
-            $is_active = $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
+            $is_active = $this->isPluginActive($plugin);
 
+            $this->resetActivePlugins();
             $is_active ? deactivate_plugins($plugin) : activate_plugins($plugin);
 
             wp_redirect(wp_get_referer());
@@ -358,13 +380,12 @@ class Plugins
     {
         global $wp;
 
-
         $current_url = add_query_arg($wp->query_vars, admin_url($wp->request));
         $current_url = add_query_arg(['plugin' => base64_encode($plugin)], $current_url);
 
-        $is_active = $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
+        $is_active = $this->isPluginActive($plugin);
 
-        $label = $is_active ? __('Deactivate', 'novembit-spm') : __('Activate', 'novembit-spm');
+        $label = __($is_active ? 'Deactivate' : 'Activate', 'novembit-spm');
 
         $activate_url = wp_nonce_url($current_url, self::ACTION_PLUGIN_ACTIVATE, $this->getName());
 

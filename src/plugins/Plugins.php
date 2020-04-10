@@ -227,7 +227,7 @@ class Plugins
     {
         add_filter(
             'option_active_plugins',
-            function ($plugins) {
+            function () {
                 return $this->orig_active_plugins;
             },
             PHP_INT_MAX - 9
@@ -295,7 +295,7 @@ class Plugins
 
         add_filter(
             'option_active_plugins',
-            static function ($plugins) use ($active_plugins) {
+            static function () use ($active_plugins) {
                 return $active_plugins;
             },
             PHP_INT_MAX - 10

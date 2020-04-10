@@ -44,6 +44,29 @@ class Plugins
     public const STATUS_FORCE_ENABLED = 'force_enabled';
     public const STATUS_SMART = 'smart';
 
+
+    /**
+     * Compare
+     *
+     * 'equal' => 'Equal ( = )',
+     * 'greater_than' => 'Greater than ( > )',
+     * 'greater_than_or_equal' => 'Greater than or equal ( >= )',
+     * 'less_than' => 'Less than ( < )',
+     * 'less_than_or_equal' => 'Less than or equal ( <= )',
+     * 'not' => 'Not ( <> )',
+     * 'contains' => 'Contains ( %word% )',
+     * 'regexp' => 'Regular expression ( /^(man|woman)$/ )'
+     *
+     * */
+    public const COMPARE_EQUAL = 'equal';
+    public const COMPARE_GREATER_THAN = 'greater_than';
+    public const COMPARE_GREATER_THAN_OR_EQUAL = 'greater_than_or_equal';
+    public const COMPARE_LESS_THAN = 'less_than';
+    public const COMPARE_LESS_THAN_OR_EQUAL = 'less_than_or_equal';
+    public const COMPARE_NOT = 'not';
+    public const COMPARE_CONTAINS = 'contains';
+    public const COMPARE_REGEXP = 'regexp';
+
     /**
      * Actions
      * */
@@ -139,6 +162,21 @@ class Plugins
                                     'key' => [
                                         'type' => Option::TYPE_TEXT,
                                         'label' => 'Key',
+                                    ],
+                                    'compare' => [
+                                        'type' => Option::TYPE_TEXT,
+                                        'label' => 'Compare operator',
+                                        'default' => 'equal',
+                                        'values' => [
+                                            self::COMPARE_EQUAL => 'Equal ( = )',
+                                            self::COMPARE_GREATER_THAN => 'Greater than ( > )',
+                                            self::COMPARE_GREATER_THAN_OR_EQUAL => 'Greater than or equal ( >= )',
+                                            self::COMPARE_LESS_THAN=> 'Less than ( < )',
+                                            self::COMPARE_LESS_THAN_OR_EQUAL => 'Less than or equal ( <= )',
+                                            self::COMPARE_NOT => 'Not ( <> )',
+                                            self::COMPARE_CONTAINS => 'Contains ( %word% )',
+                                            self::COMPARE_REGEXP => 'Regular expression ( /^(man|woman)$/ )'
+                                        ]
                                     ],
                                     'value' => [
                                         'type' => Option::TYPE_TEXT,

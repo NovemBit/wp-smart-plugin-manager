@@ -185,10 +185,6 @@ class Plugins
      */
     private function initPlugins(): void
     {
-        if (!isset($_GET['j'])) {
-            return;
-        }
-
         $active_plugins = [];
 
         $config = $this->getConfig();

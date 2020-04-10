@@ -59,11 +59,11 @@ class Plugins
      *
      * */
     public const COMPARE_EQUAL = 'equal';
+    public const COMPARE_NOT_EQUAL = 'not_equal';
     public const COMPARE_GREATER_THAN = 'greater_than';
     public const COMPARE_GREATER_THAN_OR_EQUAL = 'greater_than_or_equal';
     public const COMPARE_LESS_THAN = 'less_than';
     public const COMPARE_LESS_THAN_OR_EQUAL = 'less_than_or_equal';
-    public const COMPARE_NOT = 'not';
     public const COMPARE_CONTAINS = 'contains';
     public const COMPARE_REGEXP = 'regexp';
 
@@ -169,11 +169,11 @@ class Plugins
                                         'default' => 'equal',
                                         'values' => [
                                             self::COMPARE_EQUAL => 'Equal ( = )',
+                                            self::COMPARE_NOT_EQUAL => 'Not equal ( <> )',
                                             self::COMPARE_GREATER_THAN => 'Greater than ( > )',
                                             self::COMPARE_GREATER_THAN_OR_EQUAL => 'Greater than or equal ( >= )',
-                                            self::COMPARE_LESS_THAN=> 'Less than ( < )',
+                                            self::COMPARE_LESS_THAN => 'Less than ( < )',
                                             self::COMPARE_LESS_THAN_OR_EQUAL => 'Less than or equal ( <= )',
-                                            self::COMPARE_NOT => 'Not ( <> )',
                                             self::COMPARE_CONTAINS => 'Contains ( %word% )',
                                             self::COMPARE_REGEXP => 'Regular expression ( /^(man|woman)$/ )'
                                         ]
@@ -319,10 +319,17 @@ class Plugins
                 $type = $_rules['type'] ?? null;
                 $key = $_rules['key'] ?? null;
                 $value = $_rules['value'] ?? null;
+                $compare = $_rules['compare'] ?? null;
+
                 if (!$type || !$key) {
                     continue;
                 }
-                $assertion = $value === call_user_func([Environment::class, $type], $key);
+
+                $assertion = $this->compareVariables(
+                    $compare,
+                    call_user_func([Environment::class, $type], $key),
+                    $value
+                );
             }
 
             if ($logic === 'and') {
@@ -337,6 +344,49 @@ class Plugins
         }
 
         return $status ?? false;
+    }
+
+    /**
+     * @param string|null $type
+     * @param $a
+     * @param $b
+     * @return bool
+     */
+    private function compareVariables(?string $type, $a, $b): bool
+    {
+        if ($type === null || $type === self::COMPARE_EQUAL) {
+            return $a == $b;
+        }
+
+        if ($type === self::COMPARE_NOT_EQUAL) {
+            return $a != $b;
+        }
+
+        if ($type === self::COMPARE_GREATER_THAN) {
+            return $a > $b;
+        }
+
+        if ($type === self::COMPARE_GREATER_THAN_OR_EQUAL) {
+            return $a >= $b;
+        }
+
+        if ($type === self::COMPARE_LESS_THAN) {
+            return $a < $b;
+        }
+
+        if ($type === self::COMPARE_LESS_THAN_OR_EQUAL) {
+            return $a <= $b;
+        }
+
+        if ($type === self::COMPARE_REGEXP) {
+            return (bool)preg_match($b, $a);
+        }
+
+        if ($type === self::COMPARE_CONTAINS) {
+            return strpos($a, $b) !== false;
+        }
+
+        return false;
     }
 
     /**

@@ -9,11 +9,6 @@ class Bootstrap
 
     public const SLUG = 'smart-plugin-manager';
 
-    public function getName(): string
-    {
-        return self::SLUG;
-    }
-
     /**
      * @var Plugins
      * */
@@ -28,7 +23,6 @@ class Bootstrap
 
     /**
      * @param string|null $plugin_file
-     *
      * @return self
      */
     public static function instance(?string $plugin_file = null): self
@@ -40,6 +34,18 @@ class Bootstrap
         return self::$instance;
     }
 
+    /**
+     * @return string
+     */
+    public function getName(): string
+    {
+        return self::SLUG;
+    }
+
+    /**
+     * Bootstrap constructor.
+     * @param $plugin_file
+     */
     public function __construct($plugin_file)
     {
         $this->plugin_file = $plugin_file;
@@ -55,12 +61,15 @@ class Bootstrap
         $this->plugins = new Plugins($this);
     }
 
+    /**
+     * @return void
+     * @uses adminMenu
+     * @uses enqueueAssets
+     */
     public function adminInit(): void
     {
-
         add_action('admin_menu', [$this, 'adminMenu']);
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueueAssets' ) );
-
     }
 
     /**
@@ -68,8 +77,7 @@ class Bootstrap
      */
     public function adminMenu(): void
     {
-
-        $menu = add_menu_page(
+        add_menu_page(
             __('SPM', 'novembit-spm'),
             __('SPM', 'novembit-spm'),
             'manage_options',
@@ -87,19 +95,25 @@ class Bootstrap
         <?php
     }
 
-    public function install(): void
+    /**
+     * @return bool
+     */
+    public function install(): bool
     {
         $mu = WPMU_PLUGIN_DIR . '/' . $this->getName() . '.php';
         $content = '<?php' . PHP_EOL;
         $content .= ' // This is auto generated file' . PHP_EOL;
         $content .= 'include_once WP_PLUGIN_DIR."/' . $this->getName() . '/' . $this->getName() . '.php";';
-        file_put_contents($mu, $content);
+        return file_put_contents($mu, $content);
     }
 
-    public function uninstall(): void
+    /**
+     * @return bool
+     */
+    public function uninstall(): bool
     {
         $mu = WPMU_PLUGIN_DIR . '/' . $this->getName() . '.php';
-        unlink($mu);
+        return unlink($mu);
     }
 
     /**
@@ -118,7 +132,6 @@ class Bootstrap
         return plugin_dir_url($this->getPluginFile());
     }
 
-
     /**
      * @return mixed
      */
@@ -128,7 +141,7 @@ class Bootstrap
     }
 
     /**
-     *
+     * @return void
      */
     public function enqueueAssets(): void
     {

@@ -3,8 +3,6 @@
 
 namespace NovemBit\wp\plugins\spm\plugins;
 
-
-use diazoxide\helpers\Arrays;
 use diazoxide\helpers\Environment;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
@@ -83,6 +81,9 @@ class Plugins
     /**
      * Plugins constructor.
      * @param Bootstrap $parent
+     * @uses setBeforeNestedFields
+     * @uses handleRequestActions
+     * @uses setNestedFieldName
      */
     public function __construct(Bootstrap $parent)
     {
@@ -470,11 +471,8 @@ class Plugins
 
         $current_url = add_query_arg($wp->query_vars, admin_url($wp->request));
         $current_url = add_query_arg(['plugin' => base64_encode($plugin)], $current_url);
-
         $is_active = $this->isPluginActive($plugin);
-
         $label = __($is_active ? 'Deactivate' : 'Activate', 'novembit-spm');
-
         $activate_url = wp_nonce_url($current_url, self::ACTION_PLUGIN_ACTIVATE, $this->getName());
 
         ob_start();
@@ -535,6 +533,7 @@ class Plugins
 
     /**
      * @return void
+     * @uses adminMenu
      */
     public function adminInit(): void
     {

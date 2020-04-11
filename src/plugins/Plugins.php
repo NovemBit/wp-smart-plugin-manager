@@ -4,6 +4,7 @@
 namespace NovemBit\wp\plugins\spm\plugins;
 
 use diazoxide\helpers\Environment;
+use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
 
@@ -42,28 +43,6 @@ class Plugins
     public const STATUS_FORCE_ENABLED = 'force_enabled';
     public const STATUS_SMART = 'smart';
 
-
-    /**
-     * Compare
-     *
-     * 'equal' => 'Equal ( = )',
-     * 'greater_than' => 'Greater than ( > )',
-     * 'greater_than_or_equal' => 'Greater than or equal ( >= )',
-     * 'less_than' => 'Less than ( < )',
-     * 'less_than_or_equal' => 'Less than or equal ( <= )',
-     * 'not' => 'Not ( <> )',
-     * 'contains' => 'Contains ( %word% )',
-     * 'regexp' => 'Regular expression ( /^(man|woman)$/ )'
-     *
-     * */
-    public const COMPARE_EQUAL = 'equal';
-    public const COMPARE_NOT_EQUAL = 'not_equal';
-    public const COMPARE_GREATER_THAN = 'greater_than';
-    public const COMPARE_GREATER_THAN_OR_EQUAL = 'greater_than_or_equal';
-    public const COMPARE_LESS_THAN = 'less_than';
-    public const COMPARE_LESS_THAN_OR_EQUAL = 'less_than_or_equal';
-    public const COMPARE_CONTAINS = 'contains';
-    public const COMPARE_REGEXP = 'regexp';
 
     /**
      * Actions
@@ -169,14 +148,16 @@ class Plugins
                                         'label' => 'Compare operator',
                                         'default' => 'equal',
                                         'values' => [
-                                            self::COMPARE_EQUAL => 'Equal ( = )',
-                                            self::COMPARE_NOT_EQUAL => 'Not equal ( <> )',
-                                            self::COMPARE_GREATER_THAN => 'Greater than ( > )',
-                                            self::COMPARE_GREATER_THAN_OR_EQUAL => 'Greater than or equal ( >= )',
-                                            self::COMPARE_LESS_THAN => 'Less than ( < )',
-                                            self::COMPARE_LESS_THAN_OR_EQUAL => 'Less than or equal ( <= )',
-                                            self::COMPARE_CONTAINS => 'Contains ( %word% )',
-                                            self::COMPARE_REGEXP => 'Regular expression ( /^(man|woman)$/ )'
+                                            Variables::COMPARE_EQUAL => 'Equal ( = )',
+                                            Variables::COMPARE_NOT_EQUAL => 'Not equal ( <> )',
+                                            Variables::COMPARE_GREATER_THAN => 'Greater than ( > )',
+                                            Variables::COMPARE_GREATER_THAN_OR_EQUAL => 'Greater than or equal ( >= )',
+                                            Variables::COMPARE_LESS_THAN => 'Less than ( < )',
+                                            Variables::COMPARE_LESS_THAN_OR_EQUAL => 'Less than or equal ( <= )',
+                                            Variables::COMPARE_CONTAINS => 'Contains ( %word% )',
+                                            Variables::COMPARE_REGEXP => 'Regular expression ( /^(man|woman)$/ )',
+                                            Variables::COMPARE_STARTS_WITH => 'Starts with',
+                                            Variables::COMPARE_ENDS_WITH => 'Ends with',
                                         ]
                                     ],
                                     'value' => [
@@ -242,7 +223,26 @@ class Plugins
     {
         $this->orig_active_plugins = get_option('active_plugins');
 
-        if (Environment::server('REQUEST_URI') === '/wp-admin/plugins.php') {
+        if (Variables::compare(
+            Variables::COMPARE_STARTS_WITH,
+            Environment::server('REQUEST_URI'),
+            '/wp-admin/plugins.php'
+        )) {
+            return;
+        }
+
+        if (Variables::compare(
+            Variables::COMPARE_STARTS_WITH,
+            Environment::server('REQUEST_URI'),
+            '/wp-admin/admin.php?page=smart-plugin-manager-plugins'
+        )) {
+            add_filter(
+                'option_active_plugins',
+                static function () {
+                    return [];
+                },
+                PHP_INT_MAX - 10
+            );
             return;
         }
 
@@ -326,7 +326,7 @@ class Plugins
                     continue;
                 }
 
-                $assertion = $this->compareVariables(
+                $assertion = Variables::compare(
                     $compare,
                     call_user_func([Environment::class, $type], $key),
                     $value
@@ -345,49 +345,6 @@ class Plugins
         }
 
         return $status ?? false;
-    }
-
-    /**
-     * @param string|null $type
-     * @param $a
-     * @param $b
-     * @return bool
-     */
-    private function compareVariables(?string $type, $a, $b): bool
-    {
-        if ($type === null || $type === self::COMPARE_EQUAL) {
-            return $a == $b;
-        }
-
-        if ($type === self::COMPARE_NOT_EQUAL) {
-            return $a != $b;
-        }
-
-        if ($type === self::COMPARE_GREATER_THAN) {
-            return $a > $b;
-        }
-
-        if ($type === self::COMPARE_GREATER_THAN_OR_EQUAL) {
-            return $a >= $b;
-        }
-
-        if ($type === self::COMPARE_LESS_THAN) {
-            return $a < $b;
-        }
-
-        if ($type === self::COMPARE_LESS_THAN_OR_EQUAL) {
-            return $a <= $b;
-        }
-
-        if ($type === self::COMPARE_REGEXP) {
-            return (bool)preg_match($b, $a);
-        }
-
-        if ($type === self::COMPARE_CONTAINS) {
-            return strpos($a, $b) !== false;
-        }
-
-        return false;
     }
 
     /**
@@ -413,13 +370,21 @@ class Plugins
     }
 
     /**
+     * @return string
+     */
+    private function getSelfPlugin(): string
+    {
+        return sprintf('%1$s/%1$s.php', $this->parent->getName());
+    }
+
+    /**
      * Set All plugins
      * @return void
      */
     private function setAllPlugins(): void
     {
         $this->plugins = get_plugins();
-        unset($this->plugins[sprintf('%1$s/%1$s.php', $this->parent->getName())]);
+        unset($this->plugins[$this->getSelfPlugin()]);
         foreach ($this->plugins as $plugin => &$data) {
             $data['custom_data']['is_active'] = is_plugin_active($plugin);
         }
@@ -477,16 +442,12 @@ class Plugins
 
         ob_start();
         ?>
-
         <div class="plugin-actions">
-
             <a href="<?php echo $activate_url; ?>" class="button button-default">
                 <?php echo $this->getPluginActiveStatusBadge($plugin, false); ?>
                 <?php echo $label; ?>
             </a>
-
         </div>
-
         <?php
         return ob_get_clean();
     }

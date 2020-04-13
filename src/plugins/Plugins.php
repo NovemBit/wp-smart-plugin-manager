@@ -227,6 +227,16 @@ class Plugins
     /**
      * @return void
      */
+    public function unsetTheme():void
+    {
+        add_filter('template', '__return_null');
+        add_filter('option_template', '__return_null');
+        add_filter('option_stylesheet','__return_null');
+    }
+
+    /**
+     * @return void
+     */
     private function initActivePlugins(): void
     {
         $this->orig_active_plugins = get_option('active_plugins');
@@ -242,7 +252,7 @@ class Plugins
         if (Variables::compare(
             Variables::COMPARE_STARTS_WITH,
             Environment::server('REQUEST_URI'),
-            '/wp-admin/admin.php?page='.$this->parent->getName()
+            '/wp-admin/admin.php?page=' . $this->parent->getName()
         )) {
             add_filter(
                 'option_active_plugins',
@@ -251,6 +261,9 @@ class Plugins
                 },
                 PHP_INT_MAX - 10
             );
+
+            $this->unsetTheme();
+
             return;
         }
 

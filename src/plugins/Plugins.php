@@ -107,6 +107,13 @@ class Plugins
                         ]
                     ]
                 ),
+                'priority' => new Option(
+                    [
+                        'default' => 10,
+                        'label' => 'Priority',
+                        'markup' => Option::MARKUP_NUMBER,
+                    ]
+                ),
                 'require' => new Option(
                     [
                         'default' => [],
@@ -536,10 +543,7 @@ class Plugins
      */
     public function adminContent(): void
     {
-        ?>
-        <h1>Smart Plugin Manager - Plugins</h1>
-        <?php
-        Option::printForm($this->getName(), $this->settings);
+        Option::printForm($this->getName(), $this->settings, ['title' => 'Smart Plugin Manager - Plugins']);
     }
 
     /**

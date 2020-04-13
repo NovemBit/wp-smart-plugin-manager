@@ -242,7 +242,7 @@ class Plugins
         if (Variables::compare(
             Variables::COMPARE_STARTS_WITH,
             Environment::server('REQUEST_URI'),
-            '/wp-admin/admin.php?page=smart-plugin-manager-plugins'
+            '/wp-admin/admin.php?page='.$this->parent->getName()
         )) {
             add_filter(
                 'option_active_plugins',
@@ -317,7 +317,7 @@ class Plugins
         unset($data);
 
 
-        if (Environment::request($this->getName() . '-debug') === 'asd') {
+        if ($this->parent->authorizedDebug()) {
             $debug = '<h1>Active Plugins Tree</h1>';
             $debug .= '<pre>' . $this->printPluginsTree($tree) . '</pre>';
             wp_die($debug);

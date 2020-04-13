@@ -4,6 +4,7 @@
 namespace NovemBit\wp\plugins\spm\plugins;
 
 use diazoxide\helpers\Environment;
+use diazoxide\helpers\HTML;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
@@ -253,6 +254,7 @@ class Plugins
             return;
         }
 
+        $tree = [];
         $active_plugins = [];
 
         $config = $this->getConfig();
@@ -267,6 +269,7 @@ class Plugins
             $status = $data['status'] ?? self::STATUS_SYSTEM_DEFAULT;
 
             if ($status === self::STATUS_FORCE_ENABLED) {
+                $tree[$plugin] = [];
                 $active_plugins[] = $plugin;
                 continue;
             }
@@ -279,7 +282,14 @@ class Plugins
                 $rules = array_values($data['rules'] ?? []);
                 $force_required = $data['force_required'] ?? false;
 
+
                 if ($force_required || $this->checkRules($rules)) {
+                    if ($force_required) {
+                        $demanding_from = &$data['demanding_from'][$plugin];
+                    } else {
+                        $demanding_from = &$tree[$plugin];
+                    }
+
                     $required = $data['require'] ?? [];
                     foreach ($required as $_plugin) {
                         if (
@@ -289,6 +299,7 @@ class Plugins
                         ) {
                             $_config = $config[$_plugin];
                             $_config['force_required'] = true;
+                            $_config['demanding_from'] = &$demanding_from;
                             unset($config[$_plugin]);
                             $config[$_plugin] = $_config;
                         }
@@ -296,10 +307,21 @@ class Plugins
                 } else {
                     continue;
                 }
+            } else {
+                $tree[$plugin] = [];
             }
+
+
             $active_plugins[] = $plugin;
         }
         unset($data);
+
+
+        if (Environment::request($this->getName() . '-debug') === 'asd') {
+            $debug = '<h1>Active Plugins Tree</h1>';
+            $debug .= '<pre>' . $this->printPluginsTree($tree) . '</pre>';
+            wp_die($debug);
+        }
 
         add_filter(
             'option_active_plugins',
@@ -308,6 +330,22 @@ class Plugins
             },
             PHP_INT_MAX - 10
         );
+    }
+
+    private function printPluginsTree($tree, $level = 0)
+    {
+        $html = '';
+        foreach ($tree as $plugin => $_tree) {
+            $_level = $level;
+            $prefix = str_repeat('――', $_level);
+            $plugin = $this->plugins[$plugin]['Name'] ?? $plugin;
+            $html .= $prefix . $plugin . PHP_EOL;
+            if (!empty($_tree)) {
+                $_level++;
+                $html .= $this->printPluginsTree($_tree, $_level);
+            }
+        }
+        return $html;
     }
 
     /**

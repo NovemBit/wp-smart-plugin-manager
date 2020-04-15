@@ -64,6 +64,11 @@ class Patterns
             ),
         ];
 
+        add_filter(
+            Option::getOptionFilterName('patterns', $this->getName()),
+            [$this, 'predefinedPatterns']
+        );
+
         $this->config = Option::expandOptions($this->settings, $this->getName());
 
         if (is_admin()) {
@@ -71,10 +76,74 @@ class Patterns
         }
     }
 
+    public function predefinedPatterns(array $patterns): array
+    {
+        $predefined_patterns = [
+            [
+                'name' => 'is_admin',
+                'label' => 'Is Administrator',
+                'rules' =>
+                    [
+                        [
+                            'rule' =>
+                                [
+                                    [
+                                        'type' => 'function',
+                                        'key' => 'is_admin',
+                                        'compare' => 'equal',
+                                        'value' => '1',
+                                        'logic' => 'and',
+                                    ],
+                                ],
+                            'logic' => 'and',
+                        ],
+                    ],
+            ],
+            [
+                'name' => 'is_front',
+                'label' => 'Is Frontend',
+                'rules' =>
+                    [
+                        [
+                            'rule' =>
+                                [
+                                    [
+                                        'type' => 'function',
+                                        'key' => 'is_admin',
+                                        'compare' => 'equal',
+                                        'value' => '0',
+                                        'logic' => 'and',
+                                    ],
+                                ],
+                            'logic' => 'and',
+                        ],
+                    ],
+            ]
+        ];
+
+        foreach ($predefined_patterns as $predefined_pattern) {
+            $name = $predefined_pattern['name'] ?? null;
+            if ($name !== null) {
+                $existing_rule = Arrays::ufind(
+                    $patterns,
+                    $name,
+                    'name',
+                    null,
+                    static function ($a, $b) {
+                        return $a === $b;
+                    }
+                );
+                if ($existing_rule === null) {
+                    $patterns[] = $predefined_pattern;
+                }
+            }
+        }
+        return $patterns;
+    }
+
     public function checkPatterns(array $patterns): bool
     {
         foreach ($patterns as $pattern) {
-
             $pattern = $this->getPattern($pattern);
 
 

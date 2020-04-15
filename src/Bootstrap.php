@@ -6,6 +6,7 @@ use diazoxide\helpers\Environment;
 use diazoxide\helpers\HTML;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\plugins\Plugins;
+use NovemBit\wp\plugins\spm\rules\Rules;
 
 class Bootstrap
 {
@@ -16,6 +17,11 @@ class Bootstrap
      * @var Plugins
      * */
     public $plugins;
+
+    /**
+     * @var Rules
+     * */
+    public $rules;
 
     /**
      * @var self
@@ -70,6 +76,7 @@ class Bootstrap
 
     /**
      * Bootstrap constructor.
+     * @uses getAuthorizedActionFormDescription
      * @param $plugin_file
      */
     public function __construct($plugin_file)
@@ -127,6 +134,7 @@ class Bootstrap
             $this->adminInit();
         }
 
+        $this->rules = new Rules($this);
         $this->plugins = new Plugins($this);
     }
 
@@ -193,6 +201,7 @@ class Bootstrap
 
     /**
      * @return mixed
+     * @see getPluginBasename
      */
     public function getPluginDirUrl()
     {
@@ -220,6 +229,8 @@ class Bootstrap
 
     /**
      * @param string $action
+     * @see authorizedEmergency
+     * @see authorizedDebug
      * @return bool
      */
     private function authorizedAction(string $action): bool

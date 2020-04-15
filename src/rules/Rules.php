@@ -14,6 +14,17 @@ use NovemBit\wp\plugins\spm\Bootstrap;
 class Rules
 {
 
+    public const TYPE_REQUEST = 'request';
+    public const TYPE_GET = 'get';
+    public const TYPE_POST = 'post';
+    public const TYPE_COOKIE = 'cookie';
+    public const TYPE_SERVER = 'server';
+    public const TYPE_HOOK = 'hook';
+    public const TYPE_FUNCTION = 'function';
+
+    public const LOGIC_AND = 'and';
+    public const LOGIC_OR = 'or';
+    public const LOGIC_NOT = 'not';
     /**
      * @var Bootstrap
      * */
@@ -133,9 +144,9 @@ class Rules
             'type' => Option::TYPE_TEXT,
             'label' => 'Logic',
             'values' => [
-                'and' => 'And',
-                'or' => 'Or',
-                'not' => 'Not',
+                self::LOGIC_AND => 'And',
+                self::LOGIC_OR => 'Or',
+                self::LOGIC_NOT => 'Not',
             ]
         ];
     }
@@ -154,13 +165,13 @@ class Rules
                 'type' => [
                     'type' => Option::TYPE_TEXT,
                     'values' => [
-                        'request' => 'Request',
-                        'get' => 'Get',
-                        'post' => 'Post',
-                        'cookie' => 'Cookie',
-                        'server' => 'Server',
-                        'hook' => 'Hook',
-                        'function' => 'Function'
+                        self::TYPE_REQUEST => 'Request',
+                        self::TYPE_GET => 'Get',
+                        self::TYPE_POST => 'Post',
+                        self::TYPE_COOKIE => 'Cookie',
+                        self::TYPE_SERVER => 'Server',
+                        self::TYPE_HOOK => 'Hook',
+                        self::TYPE_FUNCTION => 'Function'
                     ]
                 ],
                 'key' => [
@@ -189,6 +200,11 @@ class Rules
                 'value' => [
                     'type' => Option::TYPE_TEXT,
                     'label' => 'Value',
+                ],
+                'params' => [
+                    'label' => 'Additional params ( when needed )',
+                    'method' => Option::METHOD_MULTIPLE,
+                    'type' => Option::TYPE_TEXT
                 ],
                 'logic' => self::getLogicSetting()
             ],
@@ -219,7 +235,8 @@ class Rules
                 } elseif ($type === 'hook') {
                     $_value = apply_filters($key);
                 } elseif ($type === 'function') {
-                    $_value = $key();
+                    $params = $_rules['params'] ?? [];
+                    $_value = $key(...$params);
                 } else {
                     continue;
                 }

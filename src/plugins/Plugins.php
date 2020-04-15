@@ -4,13 +4,13 @@
 namespace NovemBit\wp\plugins\spm\plugins;
 
 use diazoxide\helpers\Environment;
-use diazoxide\helpers\HTML;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
 
 class Plugins
 {
+
     /**
      * @var Bootstrap
      * */
@@ -44,7 +44,6 @@ class Plugins
     public const STATUS_FORCE_ENABLED = 'force_enabled';
     public const STATUS_SMART = 'smart';
 
-
     /**
      * Actions
      * */
@@ -55,7 +54,7 @@ class Plugins
      */
     public function getName(): string
     {
-        return $this->parent->getName() . '-' . 'plugins';
+        return $this->parent->getName() . '-plugins';
     }
 
     /**
@@ -84,15 +83,16 @@ class Plugins
                 'wp-lib-option/' . $this->getName() . '/form-nested-label',
                 [$this, 'setNestedFieldName'],
                 10,
-                3
+                1
             );
 
             add_filter(
                 'wp-lib-option/' . $this->getName() . '/form-before-nested-fields',
                 [$this, 'setBeforeNestedFields'],
                 10,
-                3
+                2
             );
+
             $plugins_list = $plugins;
             unset($plugins_list[$file]);
             $this->settings[$file] = [
@@ -130,69 +130,7 @@ class Plugins
                         'type' => Option::TYPE_GROUP,
                         'values' => [],
                         'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);'],
-                        'template' => [
-                            'rule' => [
-                                'type' => Option::TYPE_GROUP,
-                                'method' => Option::METHOD_MULTIPLE,
-                                'label' => 'Single Rule',
-                                'main_params' => ['style' => 'grid-template-columns: repeat(3, 1fr);display:grid'],
-                                'template' => [
-                                    'type' => [
-                                        'type' => Option::TYPE_TEXT,
-                                        'values' => [
-                                            'request' => 'Request',
-                                            'get' => 'Get',
-                                            'post' => 'Post',
-                                            'cookie' => 'Cookie',
-                                            'server' => 'Server'
-                                        ]
-                                    ],
-                                    'key' => [
-                                        'type' => Option::TYPE_TEXT,
-                                        'label' => 'Key',
-                                    ],
-                                    'compare' => [
-                                        'type' => Option::TYPE_TEXT,
-                                        'label' => 'Compare operator',
-                                        'default' => 'equal',
-                                        'values' => [
-                                            Variables::COMPARE_EQUAL => 'Equal ( = )',
-                                            Variables::COMPARE_NOT_EQUAL => 'Not equal ( <> )',
-                                            Variables::COMPARE_GREATER_THAN => 'Greater than ( > )',
-                                            Variables::COMPARE_GREATER_THAN_OR_EQUAL => 'Greater than or equal ( >= )',
-                                            Variables::COMPARE_LESS_THAN => 'Less than ( < )',
-                                            Variables::COMPARE_LESS_THAN_OR_EQUAL => 'Less than or equal ( <= )',
-                                            Variables::COMPARE_CONTAINS => 'Contains ( %word% )',
-                                            Variables::COMPARE_REGEXP => 'Regular expression ( /^(man|woman)$/ )',
-                                            Variables::COMPARE_STARTS_WITH => 'Starts with',
-                                            Variables::COMPARE_ENDS_WITH => 'Ends with',
-                                        ]
-                                    ],
-                                    'value' => [
-                                        'type' => Option::TYPE_TEXT,
-                                        'label' => 'Value',
-                                    ],
-                                    'logic' => [
-                                        'type' => Option::TYPE_TEXT,
-                                        'label' => 'Logic',
-                                        'values' => [
-                                            'and' => 'And',
-                                            'or' => 'Or',
-                                            'not' => 'Not',
-                                        ]
-                                    ]
-                                ],
-                            ],
-                            'logic' => [
-                                'type' => Option::TYPE_TEXT,
-                                'label' => 'Logic',
-                                'values' => [
-                                    'and' => 'And',
-                                    'or' => 'Or',
-                                    'not' => 'Not',
-                                ]
-                            ]
-                        ],
+                        'template' => $this->parent->rules::getRulesSettings(),
                         'label' => 'Rules'
                     ]
                 ),
@@ -213,12 +151,16 @@ class Plugins
         return $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
     }
 
+
+    /**
+     * @return void
+     */
     private function resetActivePlugins(): void
     {
         add_filter(
             'option_active_plugins',
             function () {
-                return $this->orig_active_plugins;
+                return $this->getOrigActivePlugins();
             },
             PHP_INT_MAX - 9
         );
@@ -227,11 +169,11 @@ class Plugins
     /**
      * @return void
      */
-    public function unsetTheme():void
+    public function unsetTheme(): void
     {
         add_filter('template', '__return_null');
         add_filter('option_template', '__return_null');
-        add_filter('option_stylesheet','__return_null');
+        add_filter('option_stylesheet', '__return_null');
     }
 
     /**
@@ -345,7 +287,12 @@ class Plugins
         );
     }
 
-    private function printPluginsTree($tree, $level = 0)
+    /**
+     * @param $tree
+     * @param int $level
+     * @return string
+     */
+    private function printPluginsTree($tree, $level = 0): string
     {
         $html = '';
         foreach ($tree as $plugin => $_tree) {
@@ -384,11 +331,19 @@ class Plugins
                     continue;
                 }
 
-                $assertion = Variables::compare(
-                    $compare,
-                    call_user_func([Environment::class, $type], $key),
-                    $value
-                );
+                if (in_array($type, ['request', 'get', 'post', 'server', 'cookie'])) {
+                    $assertion = Variables::compare(
+                        $compare,
+                        call_user_func([Environment::class, $type], $key),
+                        $value
+                    );
+                } elseif ($type === 'hook') {
+                    $assertion = apply_filters($key);
+                } elseif ($type === 'function') {
+                    $assertion = $key();
+                } else {
+                    continue;
+                }
             }
 
             if ($logic === 'and') {
@@ -450,11 +405,9 @@ class Plugins
 
     /**
      * @param $label
-     * @param $route
-     * @param $parent
      * @return string
      */
-    public function setNestedFieldName($label, $route, $parent): string
+    public function setNestedFieldName($label): string
     {
         $plugin = $label;
         $label = $this->plugins[$plugin]['Name'] ?? $label;
@@ -468,10 +421,9 @@ class Plugins
     /**
      * @param $content
      * @param $route
-     * @param $parent
      * @return string
      */
-    public function setBeforeNestedFields($content, $route, $parent): string
+    public function setBeforeNestedFields($content, $route): string
     {
         $html = '';
         $plugin_data = $this->plugins[$route] ?? null;
@@ -561,13 +513,14 @@ class Plugins
 
     /**
      * @return void
+     * @uses adminContent
      */
     public function adminMenu(): void
     {
         add_submenu_page(
             $this->parent->getName(),
-            __('Plugins'),
-            __('Plugins'),
+            __('Plugins', 'novembit-spm'),
+            __('Plugins', 'novembit-spm'),
             'manage_options',
             $this->getName(),
             [$this, 'adminContent']
@@ -594,7 +547,15 @@ class Plugins
      */
     public function adminContent(): void
     {
-        Option::printForm($this->getName(), $this->settings, ['title' => 'Smart Plugin Manager - Plugins']);
+        Option::printForm(
+            $this->getName(),
+            $this->settings,
+            [
+                'title' => 'Smart Plugin Manager - Plugins',
+                'ajax_submit' => true,
+                'auto_submit' => true,
+            ]
+        );
     }
 
     /**
@@ -603,5 +564,13 @@ class Plugins
     public function getConfig(): array
     {
         return $this->config;
+    }
+
+    /**
+     * @return array
+     */
+    public function getOrigActivePlugins(): array
+    {
+        return $this->orig_active_plugins;
     }
 }

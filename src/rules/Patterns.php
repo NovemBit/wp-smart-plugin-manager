@@ -4,7 +4,7 @@
 namespace NovemBit\wp\plugins\spm\rules;
 
 
-use diazoxide\helpers\Variables;
+use diazoxide\helpers\Arrays;
 use diazoxide\wp\lib\option\v2\Option;
 
 class Patterns
@@ -40,8 +40,25 @@ class Patterns
                     'method' => Option::METHOD_MULTIPLE,
                     'type' => Option::TYPE_GROUP,
                     'values' => [],
-                    'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);'],
-                    'template' => $this->parent::getRulesSettings(true),
+                    'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);display:grid'],
+                    'template' => [
+                        'name' => [
+                            'label' => 'Name',
+                            'type' => Option::TYPE_TEXT,
+                            'required' => true,
+                        ],
+                        'label' => [
+                            'label' => 'Label',
+                            'type' => Option::TYPE_TEXT,
+                            'required' => true,
+                        ],
+                        'rules' => [
+                            'main_params' => ['style' => 'grid-template-columns: repeat(2, 1fr);display:grid'],
+                            'type' => Option::TYPE_GROUP,
+                            'method' => Option::METHOD_MULTIPLE,
+                            'template' => $this->parent::getRulesSettings()
+                        ]
+                    ],
                     'label' => 'Rules'
                 ]
             ),
@@ -54,17 +71,49 @@ class Patterns
         }
     }
 
+    public function checkPatterns(array $patterns): bool
+    {
+        foreach ($patterns as $pattern) {
+
+            $pattern = $this->getPattern($pattern);
+
+
+            if (isset($pattern['rules']) && $this->parent->checkRules($pattern['rules'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getPattern($name)
+    {
+        return Arrays::ufind(
+            $this->getPatterns(),
+            $name,
+            'name',
+            null,
+            static function ($a, $b) {
+                return $a === $b;
+            }
+        );
+    }
+
     public function getPatterns(): array
     {
         return $this->config['patterns'] ?? [];
     }
 
-    public function getPatternsList()
+    public function getPatternsMap(): array
     {
         $list = [];
-        foreach ($this->getPatterns() as $pattern){
-            $list[] = $pattern['name'];
+        foreach ($this->getPatterns() as $pattern) {
+            if (isset($pattern['name'])) {
+                $list[$pattern['name']] = $pattern['label'] ?? $pattern['name'];
+            }
         }
+
+        return $list;
     }
 
     /**

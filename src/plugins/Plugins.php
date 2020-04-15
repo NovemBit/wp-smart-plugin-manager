@@ -123,6 +123,15 @@ class Plugins
                         'label' => 'Required plugins'
                     ]
                 ),
+                'rules_patterns' => new Option(
+                    [
+                        'label' => 'Predefined rule patterns',
+                        'method' => Option::METHOD_MULTIPLE,
+                        'type' => Option::TYPE_TEXT,
+                        'markup' => Option::MARKUP_CHECKBOX,
+                        'values' => $this->parent->rules->patterns->getPatternsMap()
+                    ]
+                ),
                 'rules' => new Option(
                     [
                         'default' => [],
@@ -235,10 +244,13 @@ class Plugins
 
             if ($status === self::STATUS_SMART) {
                 $rules = array_values($data['rules'] ?? []);
+                $rules_patterns = array_values($data['rules_patterns'] ?? []);
                 $force_required = $data['force_required'] ?? false;
 
 
-                if ($force_required || $this->checkRules($rules)) {
+                if ($force_required
+                    || $this->parent->rules->patterns->checkPatterns($rules_patterns)
+                    || $this->parent->rules->checkRules($rules)) {
                     if ($force_required) {
                         $demanding_from = &$data['demanding_from'][$plugin];
                     } else {
@@ -306,58 +318,6 @@ class Plugins
             }
         }
         return $html;
-    }
-
-    /**
-     * @param array $rules
-     * @return bool
-     */
-    private function checkRules(array $rules): bool
-    {
-        $status = null;
-
-        foreach ($rules as $_rules) {
-            $logic = $_rules['logic'] ?? 'and';
-
-            if (isset($_rules['rule'])) {
-                $assertion = $this->checkRules(array_values($_rules['rule']));
-            } else {
-                $type = $_rules['type'] ?? null;
-                $key = $_rules['key'] ?? null;
-                $value = $_rules['value'] ?? null;
-                $compare = $_rules['compare'] ?? null;
-
-                if (!$type || !$key) {
-                    continue;
-                }
-
-                if (in_array($type, ['request', 'get', 'post', 'server', 'cookie'])) {
-                    $assertion = Variables::compare(
-                        $compare,
-                        call_user_func([Environment::class, $type], $key),
-                        $value
-                    );
-                } elseif ($type === 'hook') {
-                    $assertion = apply_filters($key);
-                } elseif ($type === 'function') {
-                    $assertion = $key();
-                } else {
-                    continue;
-                }
-            }
-
-            if ($logic === 'and') {
-                $status = ($status ?? true) && $assertion;
-            }
-            if ($logic === 'or') {
-                $status = ($status ?? true) || $assertion;
-            }
-            if ($logic === 'not') {
-                $status = ($status ?? true) && !$assertion;
-            }
-        }
-
-        return $status ?? false;
     }
 
     /**

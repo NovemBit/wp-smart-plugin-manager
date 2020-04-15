@@ -112,29 +112,19 @@ class Rules
         }
     }
 
-    public function defaultTabContent()
+    public function defaultTabContent(): void
     {
-        echo 111;
+        ?>
+        <h1>Rules</h1>
+        <?php
     }
 
-    public static function getRulesSettings($with_name = false): array
+    public static function getRulesSettings(): array
     {
-        $result = [
+        return [
             'rule' => self::getRuleSetting(),
             'logic' => self::getLogicSetting()
         ];
-
-        if ($with_name) {
-            $result = [
-                    'name' => [
-                        'label' => 'Name',
-                        'type' => Option::TYPE_TEXT,
-                        'required'=>true,
-                    ]
-                ] + $result;
-        }
-
-        return $result;
     }
 
     public static function getLogicSetting(): array
@@ -204,4 +194,50 @@ class Rules
             ],
         ];
     }
+
+    public function checkRules(array $rules): bool
+    {
+        $status = null;
+
+        foreach ($rules as $_rules) {
+            $logic = $_rules['logic'] ?? 'and';
+
+            if (isset($_rules['rule'])) {
+                $assertion = $this->checkRules(array_values($_rules['rule']));
+            } else {
+                $type = $_rules['type'] ?? null;
+                $key = $_rules['key'] ?? null;
+                $value = $_rules['value'] ?? null;
+                $compare = $_rules['compare'] ?? null;
+
+                if (!$type || !$key) {
+                    continue;
+                }
+
+                if (in_array($type, ['request', 'get', 'post', 'server', 'cookie'])) {
+                    $_value = call_user_func([Environment::class, $type], $key);
+                } elseif ($type === 'hook') {
+                    $_value = apply_filters($key);
+                } elseif ($type === 'function') {
+                    $_value = $key();
+                } else {
+                    continue;
+                }
+                $assertion = Variables::compare($compare, $_value, $value);
+            }
+
+            if ($logic === 'and') {
+                $status = ($status ?? true) && $assertion;
+            }
+            if ($logic === 'or') {
+                $status = ($status ?? true) || $assertion;
+            }
+            if ($logic === 'not') {
+                $status = ($status ?? true) && !$assertion;
+            }
+        }
+
+        return $status ?? false;
+    }
+
 }

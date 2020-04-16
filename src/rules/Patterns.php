@@ -68,7 +68,9 @@ class Patterns
 
         add_filter(
             Option::getOptionFilterName('patterns', $this->getName()),
-            [$this, 'predefinedPatterns']
+            function ($patterns) {
+                return $this->overwritePredefinedPatterns($patterns, $this->predefinedPatterns());
+            }
         );
 
 
@@ -84,13 +86,9 @@ class Patterns
         }
     }
 
-    /**
-     * @param array $patterns
-     * @return array
-     */
-    public function predefinedPatterns(array $patterns): array
+    public function predefinedPatterns()
     {
-        $predefined_patterns = [
+        return [
             // Is Backend
             [
                 'name' => 'backend',
@@ -137,7 +135,15 @@ class Patterns
                     ],
             ]
         ];
+    }
 
+    /**
+     * @param array $patterns
+     * @param array $predefined_patterns
+     * @return array
+     */
+    public function overwritePredefinedPatterns(array $patterns, array $predefined_patterns): array
+    {
         foreach ($predefined_patterns as $predefined_pattern) {
             $name = $predefined_pattern['name'] ?? null;
             if ($name !== null) {
@@ -262,19 +268,42 @@ class Patterns
 
     private function initPatternsGenerator(): void
     {
-        /** @var \WP_Rewrite $wp_rewrite */
-        global $wp_rewrite;
+        if (wp_verify_nonce(Environment::post($this->getName()), 'generate')) {
 
-        $extra = $wp_rewrite->extra_rules;
-        $extra_rules_top = $wp_rewrite->extra_rules_top;
-        $extra_param_struct = $wp_rewrite->extra_permastructs;
+            global $wp_rewrite;
+            $rewrite_rules = $wp_rewrite->wp_rewrite_rules();
+            foreach ($rewrite_rules as $rule => $rewrite) {
+                $generated_patterns[] = [
+                    'name' => $rule,
+                    'label' => $rule,
+                    'rules' =>
+                        [
+                            [
+                                'rule' =>
+                                    [
+                                        [
+                                            'type' => $this->parent::TYPE_SERVER,
+                                            'key' => 'REQUEST_URI',
+                                            'compare' => Variables::COMPARE_REGEXP,
+                                            'value' => '#'.$rule.'#',
+                                            'logic' => $this->parent::LOGIC_AND,
+                                        ],
+                                    ],
+                                'logic' => $this->parent::LOGIC_AND,
+                            ],
+                        ],
+                ];
+            }
 
+            add_filter(
+                Option::getOptionFilterName('patterns', $this->getName()),
+                function ($patterns) use ($generated_patterns) {
+                    return $this->overwritePredefinedPatterns($patterns, $generated_patterns);
+                }
+            );
 
-        foreach ($extra_rules_top as $rule => $rewrite) {
-            echo $rule . '<br>';
+            return;
         }
-
-        return;
 
 
         echo HTML::tagOpen('div', ['class' => 'wrap']);

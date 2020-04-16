@@ -41,12 +41,35 @@ class Rules
     public $tabs = [];
 
     /**
+     * @var array
+     * */
+    public $settings = [];
+
+    public $config = [];
+
+    /**
      * Patterns constructor.
      * @param Bootstrap $parent
      */
     public function __construct(Bootstrap $parent)
     {
         $this->parent = $parent;
+
+        $this->settings = [
+            'common' => [
+                'auto_pattern_generation_tracker' => new Option(
+                    [
+                        'default' => false,
+                        'type' => Option::TYPE_BOOL,
+                        'label' => 'Auto pattern generation tracker'
+                    ]
+
+                )
+            ]
+        ];
+
+        $this->config = Option::expandOptions($this->settings, $this->getName());
+
         $this->patterns = new Patterns($this);
 
         if (is_admin()) {
@@ -61,8 +84,6 @@ class Rules
     public function adminInit(): void
     {
         add_action('admin_menu', [$this, 'adminMenu']);
-
-        $this->tabs['default'] = ['label' => 'Rules', 'content' => [$this, 'defaultTabContent']];
     }
 
     /**
@@ -87,6 +108,8 @@ class Rules
             $this->getName(),
             [$this, 'adminContent']
         );
+
+        $this->tabs['default'] = ['label' => 'Rules', 'content' => [$this, 'defaultTabContent']];
     }
 
     /**
@@ -97,11 +120,13 @@ class Rules
     {
         $tabs = [];
         $current_url = admin_url('admin.php?page=' . $this->getName());
-        $active = Environment::get('action') ?? 'default';
+        $active = Environment::get('sub-action') ?? 'default';
+
         $active_tab = $this->tabs[$active];
+        $active_url = URL::addQueryVars($current_url, 'sub-action', $active);
 
         foreach ($this->tabs as $tab => $params) {
-            $url = URL::addQueryVars($current_url, 'action', $tab);
+            $url = URL::addQueryVars($current_url, 'sub-action', $tab);
             $active_class = $active === $tab ? ' nav-tab-active' : '';
             $tabs[] = [
                 'a',
@@ -114,7 +139,7 @@ class Rules
         $content = $active_tab['content'] ?? null;
 
         if (is_callable($content)) {
-            $content();
+            $content($active_url);
             return;
         }
 
@@ -123,13 +148,17 @@ class Rules
         }
     }
 
-    public function defaultTabContent(): void
+    public function defaultTabContent($url): void
     {
         ?>
         <h1>Rules</h1>
         <?php
+        Option::printForm($this->getName(), $this->settings);
     }
 
+    /**
+     * @return array
+     */
     public static function getRulesSettings(): array
     {
         return [
@@ -138,6 +167,9 @@ class Rules
         ];
     }
 
+    /**
+     * @return array
+     */
     public static function getLogicSetting(): array
     {
         return [
@@ -211,6 +243,10 @@ class Rules
         ];
     }
 
+    /**
+     * @param array $rules
+     * @return bool
+     */
     public function checkRules(array $rules): bool
     {
         $status = null;

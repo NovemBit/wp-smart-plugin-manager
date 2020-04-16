@@ -128,8 +128,9 @@ class Plugins
                         'label' => 'Predefined rule patterns',
                         'method' => Option::METHOD_MULTIPLE,
                         'type' => Option::TYPE_TEXT,
-                        'markup' => Option::MARKUP_CHECKBOX,
-                        'values' => $this->parent->rules->patterns->getPatternsMap()
+                        'values' => $this->parent->rules->patterns->getPatternsMap(),
+                        'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);'],
+
                     ]
                 ),
                 'rules' => new Option(

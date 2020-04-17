@@ -129,7 +129,7 @@ class Plugins
                         'method' => Option::METHOD_MULTIPLE,
                         'type' => Option::TYPE_TEXT,
                         'values' => $this->parent->rules->patterns->getPatternsMap(),
-                        'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);'],
+                        'main_params' => ['col' => '1'],
 
                     ]
                 ),
@@ -139,7 +139,7 @@ class Plugins
                         'method' => Option::METHOD_MULTIPLE,
                         'type' => Option::TYPE_GROUP,
                         'values' => [],
-                        'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);'],
+                        'main_params' => ['col' => '1'],
                         'template' => $this->parent->rules::getRulesSettings(),
                         'label' => 'Rules'
                     ]

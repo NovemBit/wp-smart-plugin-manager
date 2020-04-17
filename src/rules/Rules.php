@@ -192,7 +192,7 @@ class Rules
             'type' => Option::TYPE_GROUP,
             'method' => Option::METHOD_MULTIPLE,
             'label' => 'Single Rule',
-            'main_params' => ['style' => 'grid-template-columns: repeat(3, 1fr);display:grid'],
+            'main_params' => ['col' => '3'],
             'template' => [
                 'type' => [
                     'type' => Option::TYPE_TEXT,

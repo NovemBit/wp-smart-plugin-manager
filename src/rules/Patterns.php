@@ -5,8 +5,6 @@ namespace NovemBit\wp\plugins\spm\rules;
 
 
 use diazoxide\helpers\Arrays;
-use diazoxide\helpers\Environment;
-use diazoxide\helpers\HTML;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 
@@ -131,6 +129,26 @@ class Patterns
                             'logic' => $this->parent::LOGIC_AND,
                         ],
                     ],
+            ],
+            [
+                'name' => 'wp_doing_ajax',
+                'label' => 'WP Ajax request',
+                'rules' =>
+                    [
+                        [
+                            'rule' =>
+                                [
+                                    [
+                                        'type' => $this->parent::TYPE_FUNCTION,
+                                        'key' => 'wp_doing_ajax',
+                                        'compare' => Variables::COMPARE_EQUAL,
+                                        'value' => '1',
+                                        'logic' => $this->parent::LOGIC_AND,
+                                    ],
+                                ],
+                            'logic' => $this->parent::LOGIC_AND,
+                        ],
+                    ],
             ]
         ];
 
@@ -138,7 +156,7 @@ class Patterns
             $rewrite_rules = get_option('rewrite_rules', []);
             foreach ($rewrite_rules as $rule => $rewrite) {
                 $generated_patterns[] = [
-                    'name' => $rule,
+                    'name' => 'RR: '.$rule,
                     'label' => $rule,
                     'rules' =>
                         [
@@ -275,6 +293,7 @@ class Patterns
 
     /**
      * @var void
+     * @uses tabContent
      */
     public function adminMenu(): void
     {

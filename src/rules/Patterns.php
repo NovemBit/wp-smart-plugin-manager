@@ -42,17 +42,19 @@ class Patterns
                     'method' => Option::METHOD_MULTIPLE,
                     'type' => Option::TYPE_GROUP,
                     'values' => [],
-                    'main_params' => ['style' => 'grid-template-columns: repeat(1, 1fr);display:grid'],
+                    'main_params' => ['col' => '2'],
                     'template' => [
                         'name' => [
                             'label' => 'Name',
                             'type' => Option::TYPE_TEXT,
                             'required' => true,
+                            'main_params' => ['col' => 2]
                         ],
                         'label' => [
                             'label' => 'Label',
                             'type' => Option::TYPE_TEXT,
                             'required' => true,
+                            'main_params' => ['col' => 2]
                         ],
                         'rules' => [
                             'main_params' => ['style' => 'grid-template-columns: repeat(2, 1fr);display:grid'],
@@ -67,16 +69,12 @@ class Patterns
         ];
 
         add_filter(
-            Option::getOptionFilterName('patterns', $this->getName()),
-            function ($patterns) {
-                return $this->overwritePredefinedPatterns($patterns, $this->predefinedPatterns());
+            'wp-lib-option/' . $this->getName() . '/expanded-option',
+            function ($config) {
+                $this->overwritePredefinedPatterns($config['patterns'], $this->predefinedPatterns());
+                return $config;
             }
         );
-
-
-        if (($this->parent->config['common']['auto_pattern_generation_tracker'] ?? false)) {
-            add_action('shutdown', [$this, 'initAutoPatternGenerationTracker']);
-        }
 
 
         $this->config = Option::expandOptions($this->settings, $this->getName());
@@ -86,9 +84,9 @@ class Patterns
         }
     }
 
-    public function predefinedPatterns()
+    public function predefinedPatterns(): array
     {
-        return [
+        $generated_patterns = [
             // Is Backend
             [
                 'name' => 'backend',
@@ -135,14 +133,43 @@ class Patterns
                     ],
             ]
         ];
+
+        if (($this->parent->config['common']['include_wp_rewrite_rules_as_patterns'] ?? false)) {
+            $rewrite_rules = get_option('rewrite_rules', []);
+            foreach ($rewrite_rules as $rule => $rewrite) {
+                $generated_patterns[] = [
+                    'name' => $rule,
+                    'label' => $rule,
+                    'rules' =>
+                        [
+                            [
+                                'rule' =>
+                                    [
+                                        [
+                                            'type' => $this->parent::TYPE_FUNCTION,
+                                            'key' => 'parse_url',
+                                            'compare' => Variables::COMPARE_REGEXP,
+                                            'value' => '#' . $rule . '#',
+                                            'logic' => $this->parent::LOGIC_AND,
+                                            'params' => ['{{$_SERVER->REQUEST_URI}}', '{{@PHP_URL_PATH}}']
+                                        ],
+                                    ],
+                                'logic' => $this->parent::LOGIC_AND,
+                            ],
+                        ],
+                ];
+            }
+        }
+
+        return $generated_patterns;
     }
 
     /**
      * @param array $patterns
      * @param array $predefined_patterns
-     * @return array
+     * @return void
      */
-    public function overwritePredefinedPatterns(array $patterns, array $predefined_patterns): array
+    public function overwritePredefinedPatterns(array &$patterns, array $predefined_patterns): void
     {
         foreach ($predefined_patterns as $predefined_pattern) {
             $name = $predefined_pattern['name'] ?? null;
@@ -161,8 +188,6 @@ class Patterns
                 }
             }
         }
-
-        return $patterns;
     }
 
     /**
@@ -261,8 +286,6 @@ class Patterns
      */
     public function tabContent($url): void
     {
-        $this->initPatternsGenerator();
-
         Option::printForm(
             $this->getName(),
             $this->settings,
@@ -272,90 +295,4 @@ class Patterns
         );
     }
 
-    private function initPatternsGenerator(): void
-    {
-        if (wp_verify_nonce(Environment::post($this->getName()), 'generate')) {
-            global $wp_rewrite;
-            $rewrite_rules = $wp_rewrite->wp_rewrite_rules();
-            foreach ($rewrite_rules as $rule => $rewrite) {
-                $generated_patterns[] = [
-                    'name' => $rule,
-                    'label' => $rule,
-                    'rules' =>
-                        [
-                            [
-                                'rule' =>
-                                    [
-                                        [
-                                            'type' => $this->parent::TYPE_SERVER,
-                                            'key' => 'REQUEST_URI',
-                                            'compare' => Variables::COMPARE_REGEXP,
-                                            'value' => '#' . $rule . '#',
-                                            'logic' => $this->parent::LOGIC_AND,
-                                        ],
-                                    ],
-                                'logic' => $this->parent::LOGIC_AND,
-                            ],
-                        ],
-                ];
-            }
-
-            add_filter(
-                Option::getOptionFilterName('patterns', $this->getName()),
-                function ($patterns) use ($generated_patterns) {
-                    return $this->overwritePredefinedPatterns($patterns, $generated_patterns);
-                }
-            );
-
-            return;
-        }
-
-
-        echo HTML::tagOpen('div', ['class' => 'wrap']);
-
-        echo HTML::tagOpen(
-            'form',
-            [
-                'action' => '',
-                'method' => 'post'
-            ]
-        );
-
-        echo HTML::tag('button', 'Generate', ['type' => 'submit', 'class' => 'button button-primary']);
-
-        wp_nonce_field('generate', $this->getName());
-
-        echo HTML::tagClose('form');
-        echo HTML::tagClose('div');
-    }
-
-    public function getTrackingVars(): array
-    {
-        return Option::getOption('tracking_vars', $this->getName());
-    }
-
-    public function initAutoPatternGenerationTracker(): void
-    {
-        $tracking_vars = $this->getTrackingVars();
-
-        global $wp_rewrite;
-
-        /** @var \WP_Rewrite $wp_rewrite */
-        $tracking_vars['wp_rewrite']['extra_rules'] = array_merge(
-            $tracking_vars['wp_rewrite']['extra_rules'] ?? [],
-            $wp_rewrite->extra_rules
-        );
-
-        $tracking_vars['wp_rewrite']['extra_rules_top'] = array_merge(
-            $tracking_vars['wp_rewrite']['extra_rules_top'] ?? [],
-            $wp_rewrite->extra_rules_top
-        );
-
-        $tracking_vars['wp_rewrite']['extra_permastructs'] = array_merge(
-            $tracking_vars['wp_rewrite']['extra_permastructs'] ?? [],
-            $wp_rewrite->extra_permastructs
-        );
-
-        Option::setOption('tracking_vars', $this->getName(), $tracking_vars);
-    }
 }

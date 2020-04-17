@@ -263,13 +263,18 @@ class Patterns
     {
         $this->initPatternsGenerator();
 
-        Option::printForm($this->getName(), $this->settings);
+        Option::printForm(
+            $this->getName(),
+            $this->settings,
+            [
+                'wrap_params' => ['style' => 'width:100%;max-width:calc( 100% - 20px );']
+            ]
+        );
     }
 
     private function initPatternsGenerator(): void
     {
         if (wp_verify_nonce(Environment::post($this->getName()), 'generate')) {
-
             global $wp_rewrite;
             $rewrite_rules = $wp_rewrite->wp_rewrite_rules();
             foreach ($rewrite_rules as $rule => $rewrite) {
@@ -285,7 +290,7 @@ class Patterns
                                             'type' => $this->parent::TYPE_SERVER,
                                             'key' => 'REQUEST_URI',
                                             'compare' => Variables::COMPARE_REGEXP,
-                                            'value' => '#'.$rule.'#',
+                                            'value' => '#' . $rule . '#',
                                             'logic' => $this->parent::LOGIC_AND,
                                         ],
                                     ],
@@ -326,7 +331,7 @@ class Patterns
 
     public function getTrackingVars(): array
     {
-        return Option::getOption('tracking_vars', $this->getName(), []);
+        return Option::getOption('tracking_vars', $this->getName());
     }
 
     public function initAutoPatternGenerationTracker(): void

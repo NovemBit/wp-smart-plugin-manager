@@ -45,6 +45,9 @@ class Rules
      * */
     public $settings = [];
 
+    /**
+     * @var array
+     * */
     public $config = [];
 
     /**
@@ -57,13 +60,12 @@ class Rules
 
         $this->settings = [
             'common' => [
-                'auto_pattern_generation_tracker' => new Option(
+                'include_wp_rewrite_rules_as_patterns' => new Option(
                     [
                         'default' => false,
                         'type' => Option::TYPE_BOOL,
-                        'label' => 'Auto pattern generation tracker'
+                        'label' => 'Include WordPress rewrite rules as patterns'
                     ]
-
                 )
             ]
         ];
@@ -231,10 +233,10 @@ class Rules
                 ],
                 'value' => [
                     'type' => Option::TYPE_TEXT,
-                    'label' => 'Value',
+                    'label' => 'Value (accepting magic params)'
                 ],
                 'params' => [
-                    'label' => 'Additional params ( when needed )',
+                    'label' => 'Additional params ( accepting magic params )',
                     'method' => Option::METHOD_MULTIPLE,
                     'type' => Option::TYPE_TEXT
                 ],
@@ -258,21 +260,21 @@ class Rules
                 $assertion = $this->checkRules(array_values($_rules['rule']));
             } else {
                 $type = $_rules['type'] ?? null;
-                $key = $_rules['key'] ?? null;
-                $value = $_rules['value'] ?? null;
+                $key = self::extractVariables($_rules['key'] ?? null);
+                $value = self::extractVariables($_rules['value'] ?? null);
                 $compare = $_rules['compare'] ?? null;
 
                 if (!$type || !$key) {
                     continue;
                 }
 
-                if (in_array($type, ['request', 'get', 'post', 'server', 'cookie'])) {
+                if (in_array($type, [self::TYPE_REQUEST, self::TYPE_GET, self::TYPE_POST, self::TYPE_SERVER], true)) {
                     $_value = call_user_func([Environment::class, $type], $key);
-                } elseif ($type === 'hook') {
-                    $_value = apply_filters($key);
-                } elseif ($type === 'function') {
+                } elseif ($type === self::TYPE_HOOK) {
+                    $_value = apply_filters($key, null);
+                } elseif ($type === self::TYPE_FUNCTION && function_exists($key)) {
                     $params = $_rules['params'] ?? [];
-                    $_value = $key(...$params);
+                    $_value = $key(...self::extractAllVariables($params));
                 } else {
                     continue;
                 }
@@ -291,6 +293,68 @@ class Rules
         }
 
         return $status ?? false;
+    }
+
+    /**
+     * @param array $strings
+     * @return array
+     */
+    private static function extractAllVariables(array $strings): array
+    {
+        foreach ($strings as &$string) {
+            $string = self::extractVariables($string);
+        }
+        return $strings;
+    }
+
+    /**
+     * Parse strings like examples
+     *
+     * @param string $string
+     * @return string
+     * @example {{$array->key1->key2->val}}
+     * @example {{$some_global_key}}
+     */
+    private static function extractVariables(?string $string): ?string
+    {
+        if ($string === null) {
+            return null;
+        }
+        return preg_replace_callback(
+            '/{{(\$|VAR:|@|CONST:)(.*?)}}/',
+            static function ($matches) {
+                $type = $matches[1];
+                $path_parts = explode('->', $matches[2]);
+                $value = null;
+
+                $elem = null;
+
+                foreach ($path_parts as $part) {
+                    if ($elem === null) {
+                        if ($type === '$' || $type === 'VAR:') {
+                            global ${$part};
+                            if (!isset(${$part})) {
+                                break;
+                            }
+                            $elem = ${$part};
+                        } elseif ($type === '@' || $type === 'CONST:') {
+                            $elem = constant($part);
+                        } else {
+                            break;
+                        }
+                    } elseif (is_array($elem)) {
+                        $elem = $elem[$part] ?? null;
+                    } elseif (is_object($elem)) {
+                        $elem = $elem->{$elem} ?? null;
+                    } else {
+                        $elem = null;
+                        break;
+                    }
+                }
+                return $elem ?? $matches[0];
+            },
+            $string
+        );
     }
 
 }

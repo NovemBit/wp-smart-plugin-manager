@@ -132,7 +132,6 @@ class Rules
         $active = Environment::get('sub-action') ?? 'default';
 
         $active_tab = $this->tabs[$active];
-        $active_url = URL::addQueryVars($current_url, 'sub-action', $active);
 
         foreach ($this->tabs as $tab => $params) {
             $url = URL::addQueryVars($current_url, 'sub-action', $tab);
@@ -148,7 +147,7 @@ class Rules
         $content = $active_tab['content'] ?? null;
 
         if (is_callable($content)) {
-            $content($active_url);
+            $content();
             return;
         }
 
@@ -157,12 +156,13 @@ class Rules
         }
     }
 
-    public function defaultTabContent($url): void
+    /**
+     * Default Tab content
+     * @return void
+     */
+    public function defaultTabContent(): void
     {
-        ?>
-        <h1>Rules</h1>
-        <?php
-        Option::printForm($this->getName(), $this->settings);
+        Option::printForm($this->getName(), $this->settings,['title'=>'Rules configuration']);
     }
 
     /**
@@ -253,6 +253,12 @@ class Rules
     }
 
     /**
+     * Check rule with custom described pattern
+     * Included Login types
+     *      `LOGIC_AND`
+     *      `LOGIC_OR`
+     *      `LOGIC_NOT`
+     *
      * @param array $rules
      * @return bool
      */
@@ -261,7 +267,7 @@ class Rules
         $status = null;
 
         foreach ($rules as $_rules) {
-            $logic = $_rules['logic'] ?? 'and';
+            $logic = $_rules['logic'] ?? self::LOGIC_AND;
 
             if (isset($_rules['rule'])) {
                 $assertion = $this->checkRules(array_values($_rules['rule']));
@@ -320,9 +326,9 @@ class Rules
      *
      * @param string $string
      * @return string
+     *
      * @example {{$array->key1->key2->val}}
      * @example {{$some_global_key}}
-     *
      */
     private static function extractVariables(?string $string): ?string
     {

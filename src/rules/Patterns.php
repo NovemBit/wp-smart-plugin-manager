@@ -301,9 +301,9 @@ class Patterns
     }
 
     /**
-     * @param $url
+     * @return void
      */
-    public function tabContent($url): void
+    public function tabContent(): void
     {
         Option::printForm(
             $this->getName(),

@@ -64,7 +64,14 @@ class Rules
                     [
                         'default' => false,
                         'type' => Option::TYPE_BOOL,
-                        'label' => 'Include WordPress rewrite rules as patterns'
+                        'label' => 'Include WordPress rewrite rules as patterns',
+                        'description' => HTML::tag(
+                            'div',
+                            [
+                                ['h4', 'Include WordPress rewrite rules as patterns.'],
+                                ['h4', 'In plugins patterns field pattern names starting with RR']
+                            ]
+                        )
                     ]
                 )
             ]
@@ -309,11 +316,13 @@ class Rules
 
     /**
      * Parse strings like examples
+     * https://regex101.com/r/kuPqSO/1
      *
      * @param string $string
      * @return string
      * @example {{$array->key1->key2->val}}
      * @example {{$some_global_key}}
+     *
      */
     private static function extractVariables(?string $string): ?string
     {

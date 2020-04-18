@@ -156,8 +156,8 @@ class Patterns
             $rewrite_rules = get_option('rewrite_rules', []);
             foreach ($rewrite_rules as $rule => $rewrite) {
                 $generated_patterns[] = [
-                    'name' => 'RR: '.$rule,
-                    'label' => $rule,
+                    'name' => $rule,
+                    'label' => 'RR: ' . $rule,
                     'rules' =>
                         [
                             [

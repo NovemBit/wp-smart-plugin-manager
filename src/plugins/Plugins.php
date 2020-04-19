@@ -42,6 +42,8 @@ class Plugins
     public const STATUS_SYSTEM_DEFAULT = 'default';
     public const STATUS_FORCE_DISABLED = 'force_disabled';
     public const STATUS_FORCE_ENABLED = 'force_enabled';
+    public const STATUS_ENABLE_WHEN = 'enable_when';
+    public const STATUS_DISABLE_WHEN = 'disable_when';
     public const STATUS_SMART = 'smart';
 
     /**
@@ -104,6 +106,8 @@ class Plugins
                             self::STATUS_SYSTEM_DEFAULT => 'System default',
                             self::STATUS_FORCE_DISABLED => 'Force disabled',
                             self::STATUS_FORCE_ENABLED => 'Force enabled',
+                            self::STATUS_ENABLE_WHEN => 'Enable when',
+                            self::STATUS_DISABLE_WHEN => 'Disable when',
                             self::STATUS_SMART => 'Smart control',
                         ]
                     ]
@@ -133,7 +137,7 @@ class Plugins
 
                     ]
                 ),
-                'rules' => new Option(
+                'rules' => ($this->parent->rules->config['common']['plugin_custom_rules'] ?? false) ? new Option(
                     [
                         'default' => [],
                         'method' => Option::METHOD_MULTIPLE,
@@ -143,7 +147,7 @@ class Plugins
                         'template' => $this->parent->rules::getRulesSettings(),
                         'label' => 'Rules'
                     ]
-                ),
+                ) : [],
             ];
         }
 
@@ -243,15 +247,35 @@ class Plugins
                 continue;
             }
 
-            if ($status === self::STATUS_SMART) {
+            if (in_array($status, [self::STATUS_SMART, self::STATUS_ENABLE_WHEN, self::STATUS_DISABLE_WHEN], true)) {
+
+                if ($status === self::STATUS_DISABLE_WHEN) {
+                    $active_plugins[] = $plugin;
+                }
+
                 $rules = array_values($data['rules'] ?? []);
                 $rules_patterns = array_values($data['rules_patterns'] ?? []);
                 $force_required = $data['force_required'] ?? false;
 
 
-                if ($force_required
-                    || $this->parent->rules->patterns->checkPatterns($rules_patterns)
-                    || $this->parent->rules->checkRules($rules)) {
+                if (
+                    $force_required ||
+                    (
+                        $status === self::STATUS_ENABLE_WHEN
+                        && (
+                            $this->parent->rules->patterns->checkPatterns($rules_patterns)
+                            || $this->parent->rules->checkRules($rules)
+                        )
+                    ) ||
+                    (
+                        $status === self::STATUS_DISABLE_WHEN
+                        && !(
+                            $this->parent->rules->patterns->checkPatterns($rules_patterns)
+                            || $this->parent->rules->checkRules($rules)
+                        )
+                    )
+                ) {
+                    $active_plugins[] = $plugin;
                     if ($force_required) {
                         $demanding_from = &$data['demanding_from'][$plugin];
                     } else {
@@ -272,15 +296,15 @@ class Plugins
                             $config[$_plugin] = $_config;
                         }
                     }
-                } else {
                     continue;
                 }
             } else {
                 $tree[$plugin] = [];
             }
 
-
-            $active_plugins[] = $plugin;
+            if ($status === self::STATUS_DISABLE_WHEN) {
+                unset($active_plugins[array_search($plugin, $active_plugins, true)]);
+            }
         }
         unset($data);
 

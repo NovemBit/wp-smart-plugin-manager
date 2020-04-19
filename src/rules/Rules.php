@@ -73,8 +73,21 @@ class Rules
                             ]
                         )
                     ]
+                ),
+                'plugin_custom_rules' => new Option(
+                    [
+                        'default' => false,
+                        'type' => Option::TYPE_BOOL,
+                        'label' => 'Plugin Custom Rules',
+                        'description' => HTML::tag(
+                            'div',
+                            [
+                                ['h4', 'Each plugin can have custom specific rules.'],
+                            ]
+                        )
+                    ]
                 )
-            ]
+            ],
         ];
 
         $this->config = Option::expandOptions($this->settings, $this->getName());
@@ -162,7 +175,7 @@ class Rules
      */
     public function defaultTabContent(): void
     {
-        Option::printForm($this->getName(), $this->settings,['title'=>'Rules configuration']);
+        Option::printForm($this->getName(), $this->settings, ['title' => 'Rules configuration']);
     }
 
     /**

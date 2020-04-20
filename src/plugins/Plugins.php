@@ -4,6 +4,8 @@
 namespace NovemBit\wp\plugins\spm\plugins;
 
 use diazoxide\helpers\Environment;
+use diazoxide\helpers\HTML;
+use diazoxide\helpers\URL;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
@@ -298,7 +300,14 @@ class Plugins
                         )
                     )
                 ) {
-                    $active_plugins[] = $plugin;
+                    /**
+                     * Only when status is DISABLE_WHEN
+                     * @see STATUS_DISABLE_WHEN
+                     * */
+                    if (!in_array($plugin, $active_plugins, true)) {
+                        $active_plugins[] = $plugin;
+                    }
+
                     if ($force_required) {
                         $demanding_from = &$data['demanding_from'][$plugin];
                     } else {
@@ -332,27 +341,64 @@ class Plugins
         unset($data);
 
 
-        /**
-         * @uses adminToolbar
-         * */
-        add_action(
-            'wp_before_admin_bar_render',
-            function () use ($active_plugins) {
-                global $wp_admin_bar;
+        if (
+            ($this->parent->getConfig()['debug']['active'] ?? false) &&
+            ($this->parent->getConfig()['debug']['plugins_on_admin_bar'] ?? false)
+        ) {
+            $params = Environment::get($this->getName() . '-switch') ?? [];
 
-                foreach ($active_plugins as $active_plugin) {
-                    $wp_admin_bar->add_node(
-                        [
-                            'id' => $this->getName() . $active_plugin,
-                            'parent' => $this->getName(),
-                            'title' => $this->plugins[$active_plugin]['Name'] ?? $active_plugin,
-                            'href' => '#'
-                        ]
-                    );
+            foreach ($params as $encoded_plugin) {
+                $decoded_plugin = base64_decode($encoded_plugin);
+                if ($this->plugins[$decoded_plugin] ?? false) {
+                    if (in_array($decoded_plugin, $active_plugins, true)) {
+                        unset($active_plugins[array_search($decoded_plugin, $active_plugins, true)]);
+                    } else {
+                        $active_plugins[] = $decoded_plugin;
+                    }
                 }
-            },
-            100
-        );
+            }
+            /**
+             * @uses adminToolbar
+             * */
+            add_action(
+                'wp_before_admin_bar_render',
+                function () use ($active_plugins, $params) {
+                    global $wp_admin_bar;
+
+
+                    foreach ($this->plugins as $plugin => $data) {
+                        $active = in_array($plugin, $active_plugins, true);
+                        $title = $data['Name'] ?? $plugin;
+
+                        $_params = $params;
+                        $_params[] = base64_encode($plugin);
+                        $url = URL::addQueryVars(
+                            URL::getCurrent(),
+                            $this->getName() . '-switch',
+                            $_params
+                        );
+
+                        $wp_admin_bar->add_node(
+                            [
+                                'id' => $this->getName() . '-' . $plugin,
+                                'parent' => $this->getName(),
+                                'title' => HTML::tag(
+                                    'span',
+                                    $title,
+                                    [
+                                        'style' => 'color:' . ($active ? 'green' : 'red')
+                                    ]
+                                ),
+
+                                'href' => $url
+                            ]
+                        );
+                    }
+                },
+                100
+            );
+        }
+
 
         if ($this->parent->authorizedDebug()) {
             $debug = '<h1>Active Plugins Tree</h1>';

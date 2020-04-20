@@ -148,7 +148,15 @@ class Bootstrap
                         'type' => Option::TYPE_TEXT,
                         'description' => [$this, 'getAuthorizedActionFormDescription']
                     ]
-                )
+                ),
+                'plugins_on_admin_bar' => new Option(
+                    [
+                        'main_params' => ['style' => 'grid-template-columns: repeat(2, 1fr);display:grid'],
+                        'default' => true,
+                        'label' => 'Show plugins in admin bar.',
+                        'type' => Option::TYPE_BOOL
+                    ]
+                ),
             ]
         ];
 

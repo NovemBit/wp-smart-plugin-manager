@@ -100,7 +100,7 @@ class Plugins
             $this->settings[$file] = [
                 'status' => new Option(
                     [
-                        'default' => self::STATUS_SYSTEM_DEFAULT,
+                        'default' => self::STATUS_DISABLE_WHEN,
                         'label' => 'Status',
                         'values' => [
                             self::STATUS_SYSTEM_DEFAULT => 'System default',
@@ -155,9 +155,33 @@ class Plugins
 
         $this->initActivePlugins();
 
+        /**
+         * @uses adminBarMenu
+         * */
+        add_action('admin_bar_menu', [$this, 'adminBarMenu'], 100);
+
+
         if (is_admin()) {
             $this->adminInit();
         }
+    }
+
+    /**
+     * @param $admin_bar
+     */
+    public function adminBarMenu($admin_bar): void
+    {
+        $admin_bar->add_menu(
+            array(
+                'id' => $this->getName(),
+                'parent' => $this->parent->getName(),
+                'href' => admin_url('admin.php?page=' . $this->getName()),
+                'title' => 'Plugins',
+                'meta' => array(
+                    'title' => 'Plugins',
+                ),
+            )
+        );
     }
 
     private function isPluginActive(string $plugin): bool
@@ -248,7 +272,6 @@ class Plugins
             }
 
             if (in_array($status, [self::STATUS_SMART, self::STATUS_ENABLE_WHEN, self::STATUS_DISABLE_WHEN], true)) {
-
                 if ($status === self::STATUS_DISABLE_WHEN) {
                     $active_plugins[] = $plugin;
                 }
@@ -308,6 +331,28 @@ class Plugins
         }
         unset($data);
 
+
+        /**
+         * @uses adminToolbar
+         * */
+        add_action(
+            'wp_before_admin_bar_render',
+            function () use ($active_plugins) {
+                global $wp_admin_bar;
+
+                foreach ($active_plugins as $active_plugin) {
+                    $wp_admin_bar->add_node(
+                        [
+                            'id' => $this->getName() . $active_plugin,
+                            'parent' => $this->getName(),
+                            'title' => $this->plugins[$active_plugin]['Name'] ?? $active_plugin,
+                            'href' => '#'
+                        ]
+                    );
+                }
+            },
+            100
+        );
 
         if ($this->parent->authorizedDebug()) {
             $debug = '<h1>Active Plugins Tree</h1>';

@@ -4,9 +4,11 @@ namespace NovemBit\wp\plugins\spm;
 
 use diazoxide\helpers\Environment;
 use diazoxide\helpers\HTML;
+use diazoxide\helpers\URL;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\plugins\Plugins;
 use NovemBit\wp\plugins\spm\rules\Rules;
+use WP_Admin_Bar;
 
 class Bootstrap
 {
@@ -75,9 +77,31 @@ class Bootstrap
     }
 
     /**
+     * @param string|null $url
+     * @return string|null
+     */
+    private function getDebugUrl(?string $url = null): ?string
+    {
+        if ($url === null) {
+            $url = URL::getCurrent();
+        }
+
+        $secret = $this->config['debug']['secret'] ?? null;
+        if ($secret === null) {
+            return null;
+        }
+
+        return URL::addQueryVars(
+            $url,
+            $this->getName() . '-debug-secret',
+            $secret
+        );
+    }
+
+    /**
      * Bootstrap constructor.
-     * @uses getAuthorizedActionFormDescription
      * @param $plugin_file
+     * @uses getAuthorizedActionFormDescription
      */
     public function __construct($plugin_file)
     {
@@ -134,8 +158,55 @@ class Bootstrap
             $this->adminInit();
         }
 
+        /**
+         * @uses adminBarMenu
+         * */
+        add_action('admin_bar_menu', [$this, 'adminBarMenu'], 100);
+
         $this->rules = new Rules($this);
         $this->plugins = new Plugins($this);
+    }
+
+    /**
+     * @param WP_Admin_Bar $admin_bar
+     */
+    public function adminBarMenu($admin_bar): void
+    {
+        $admin_bar->add_menu(
+            array(
+                'id' => $this->getName(),
+                'title' => __('SPM', 'novembit-spm'),
+                'meta' => array(
+                    'title' => __('Smart Plugin Manager', 'novembit-spm'),
+                ),
+            )
+        );
+
+        $admin_bar->add_menu(
+            array(
+                'id' => $this->getName() . '-settings',
+                'parent' => $this->getName(),
+                'href' => admin_url('admin.php?page=' . $this->getName()),
+                'title' => 'Settings',
+                'meta' => array(
+                    'title' => 'Settings',
+                ),
+            )
+        );
+
+        if ($this->getConfig()['debug']['active'] ?? false) {
+            $admin_bar->add_menu(
+                array(
+                    'id' => $this->getName() . '-debug',
+                    'parent' => $this->getName(),
+                    'href' => $this->getDebugUrl(),
+                    'title' => 'Debug',
+                    'meta' => array(
+                        'title' => 'Debug',
+                    ),
+                )
+            );
+        }
     }
 
     /**
@@ -165,6 +236,9 @@ class Bootstrap
         );
     }
 
+    /**
+     * Admin Content
+     */
     public function adminContent(): void
     {
         Option::printForm($this->getName(), $this->settings);
@@ -229,9 +303,9 @@ class Bootstrap
 
     /**
      * @param string $action
-     * @see authorizedEmergency
-     * @see authorizedDebug
      * @return bool
+     * @see authorizedDebug
+     * @see authorizedEmergency
      */
     private function authorizedAction(string $action): bool
     {

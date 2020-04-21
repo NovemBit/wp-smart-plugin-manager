@@ -69,7 +69,8 @@ class Patterns
         add_filter(
             'wp-lib-option/' . $this->getName() . '/expanded-option',
             function ($config) {
-                $this->overwritePredefinedPatterns($config['patterns'], $this->predefinedPatterns());
+                $this->overwritePatterns($config['patterns'], $this->predefinedPatterns());
+                $this->overwritePatterns($config['patterns'], $this->getRegistered());
                 return $config;
             }
         );
@@ -178,8 +179,26 @@ class Patterns
                 ];
             }
         }
-
         return $generated_patterns;
+    }
+
+    /**
+     * @param array $patterns
+     */
+    public function register(array $patterns): void
+    {
+        $registered_patterns = Option::getOption('registered_patterns', $this->getName(), []);
+        $this->overwritePatterns($registered_patterns, $patterns);
+        Option::setOption('registered_patterns', $this->getName(), $registered_patterns);
+    }
+
+    public function getRegistered(): array
+    {
+        return Option::getOption('registered_patterns', $this->getName(), []);
+    }
+
+    public function removeRegistered($name)
+    {
     }
 
     /**
@@ -187,7 +206,7 @@ class Patterns
      * @param array $predefined_patterns
      * @return void
      */
-    public function overwritePredefinedPatterns(array &$patterns, array $predefined_patterns): void
+    public function overwritePatterns(array &$patterns, array $predefined_patterns): void
     {
         foreach ($predefined_patterns as $predefined_pattern) {
             $name = $predefined_pattern['name'] ?? null;

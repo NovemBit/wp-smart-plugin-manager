@@ -119,13 +119,13 @@ class Plugins
                         ]
                     ]
                 ),
-                'priority' => new Option(
+                /*'priority' => new Option(
                     [
                         'default' => 10,
                         'label' => 'Priority',
                         'markup' => Option::MARKUP_NUMBER,
                     ]
-                ),
+                ),*/
                 'require' => new Option(
                     [
                         'default' => [],
@@ -158,6 +158,20 @@ class Plugins
             ];
         }
 
+        /**
+         * Sort plugins
+         * Actives first
+         * */
+        uksort($this->settings,function ($a,$b){
+            if($this->isPluginActive($a)){
+                return 0;
+            }
+            return 1;
+        });
+
+        /**
+         * Expand config from settings
+         * */
         $this->config = Option::expandOptions($this->settings, $this->getName());
 
         $this->initActivePlugins();
@@ -412,10 +426,13 @@ class Plugins
             wp_die($debug);
         }
 
+        /**
+         * @uses overwriteActivePlugins
+         * */
         add_filter(
             'option_active_plugins',
             [$this, 'overwriteActivePlugins'],
-            PHP_INT_MAX - 10,
+            PHP_INT_MAX,
             0
         );
     }
@@ -425,6 +442,9 @@ class Plugins
      */
     public function overwriteActivePlugins(): array
     {
+        /**
+         * Remove after usage to fix active_plugins option loses
+         * */
         remove_filter('option_active_plugins', [$this, 'overwriteActivePlugins'], PHP_INT_MAX);
 
         return $this->active_plugins;
@@ -619,6 +639,8 @@ class Plugins
     }
 
     /**
+     * Assign pattern to plugin
+     *
      * @param string $plugin
      * @param array $patterns
      */

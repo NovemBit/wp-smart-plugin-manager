@@ -39,6 +39,11 @@ class Plugins
     private $orig_active_plugins;
 
     /**
+     * @var array
+     * */
+    private $active_plugins = [];
+
+    /**
      * Statuses
      * */
     public const STATUS_SYSTEM_DEFAULT = 'default';
@@ -399,6 +404,7 @@ class Plugins
             );
         }
 
+        $this->active_plugins = $active_plugins;
 
         if ($this->parent->authorizedDebug()) {
             $debug = '<h1>Active Plugins Tree</h1>';
@@ -408,11 +414,20 @@ class Plugins
 
         add_filter(
             'option_active_plugins',
-            static function () use ($active_plugins) {
-                return $active_plugins;
-            },
-            PHP_INT_MAX - 10
+            [$this, 'overwriteActivePlugins'],
+            PHP_INT_MAX - 10,
+            0
         );
+    }
+
+    /**
+     * @return array
+     */
+    public function overwriteActivePlugins(): array
+    {
+        remove_filter('option_active_plugins', [$this, 'overwriteActivePlugins'], PHP_INT_MAX);
+
+        return $this->active_plugins;
     }
 
     /**
@@ -603,6 +618,23 @@ class Plugins
         );
     }
 
+    /**
+     * @param string $plugin
+     * @param array $patterns
+     */
+    public function assignPatterns(string $plugin, array $patterns): void
+    {
+        $option_name = $plugin . '>rules_patterns';
+        $option = Option::getOption($option_name, $this->getName(), []);
+
+        if (!empty($patterns)) {
+            array_push($option, ...$patterns);
+        }
+
+        $option = array_unique($option);
+
+        Option::setOption($option_name, $this->getName(), $option);
+    }
 
     /**
      * @return array

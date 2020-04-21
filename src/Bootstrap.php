@@ -166,6 +166,8 @@ class Bootstrap
             $this->adminInit();
         }
 
+        $this->commonInit();
+
         /**
          * @uses adminBarMenu
          * */
@@ -220,12 +222,23 @@ class Bootstrap
     /**
      * @return void
      * @uses adminMenu
-     * @uses enqueueAssets
+     * @uses enqueueAdminAssets
      */
     public function adminInit(): void
     {
         add_action('admin_menu', [$this, 'adminMenu']);
-        add_action('admin_enqueue_scripts', array($this, 'enqueueAssets'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueueAdminAssets'));
+    }
+
+    /**
+     * @return void
+     * @uses enqueueCommonAssets
+     */
+    public function commonInit(): void
+    {
+        add_action('wp_enqueue_scripts', array($this, 'enqueueCommonAssets'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueueCommonAssets'));
+
     }
 
     /**
@@ -301,12 +314,20 @@ class Bootstrap
     /**
      * @return void
      */
-    public function enqueueAssets(): void
+    public function enqueueAdminAssets(): void
     {
         global $plugin_page;
         if (strpos($plugin_page, $this->getName()) !== false) {
             wp_enqueue_style($this->getName(), $this->getPluginDirUrl() . '/assets/style/admin.css', null, '1.0.1');
         }
+    }
+
+    /**
+     * @return void
+     */
+    public function enqueueCommonAssets(): void
+    {
+        wp_enqueue_style($this->getName(), $this->getPluginDirUrl() . '/assets/style/common.css', null, '1.0.1');
     }
 
     /**

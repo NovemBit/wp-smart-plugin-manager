@@ -1,0 +1,6 @@
+ul#wp-admin-bar-smart-plugin-manager-plugins-default {
+    max-height: calc( 100vh - 200px );
+    overflow-y:auto;
+    overflow-x:hidden;
+    max-width:400px;
+}

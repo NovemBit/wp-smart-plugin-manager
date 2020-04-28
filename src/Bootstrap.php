@@ -238,7 +238,6 @@ class Bootstrap
     {
         add_action('wp_enqueue_scripts', array($this, 'enqueueCommonAssets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueueCommonAssets'));
-
     }
 
     /**

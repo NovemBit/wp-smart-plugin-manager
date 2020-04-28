@@ -3,6 +3,7 @@
 
 namespace NovemBit\wp\plugins\spm\plugins;
 
+use diazoxide\helpers\Arrays;
 use diazoxide\helpers\Environment;
 use diazoxide\helpers\HTML;
 use diazoxide\helpers\URL;
@@ -43,6 +44,7 @@ class Plugins
      * */
     private $active_plugins = [];
 
+    private $tree = [];
     /**
      * Statuses
      * */
@@ -162,12 +164,15 @@ class Plugins
          * Sort plugins
          * Actives first
          * */
-        uksort($this->settings,function ($a,$b){
-            if($this->isPluginActive($a)){
-                return 0;
+        uksort(
+            $this->settings,
+            function ($a, $b) {
+                if ($this->isPluginActive($a)) {
+                    return 0;
+                }
+                return 1;
             }
-            return 1;
-        });
+        );
 
         /**
          * Expand config from settings
@@ -180,7 +185,6 @@ class Plugins
          * @uses adminBarMenu
          * */
         add_action('admin_bar_menu', [$this, 'adminBarMenu'], 100);
-
 
         if (is_admin()) {
             $this->adminInit();
@@ -200,6 +204,17 @@ class Plugins
                 'title' => 'Plugins',
                 'meta' => array(
                     'title' => 'Plugins',
+                ),
+            )
+        );
+        $admin_bar->add_menu(
+            array(
+                'id' => $this->getName() . '-tree',
+                'parent' => $this->parent->getName(),
+                'href' => '#',
+                'title' => 'Tree',
+                'meta' => array(
+                    'title' => 'Tree',
                 ),
             )
         );
@@ -235,6 +250,70 @@ class Plugins
         add_filter('option_stylesheet', '__return_null');
     }
 
+    private static function inArrayKeysRecursive($tree, $plugin, &$count): void
+    {
+        foreach ($tree as $_plugin => $item) {
+            if ($_plugin === $plugin) {
+                $count++;
+            }
+            if (is_array($item)) {
+                self::inArrayKeysRecursive($item, $plugin, $count);
+            }
+        }
+    }
+
+    /**
+     * @param $plugin
+     * @return bool
+     */
+    private function inTree($plugin): bool
+    {
+        self::inArrayKeysRecursive($this->tree, $plugin, $count);
+        return $count > 0;
+    }
+
+    /**
+     * @param array $tree
+     * @param string $plugin
+     */
+    private static function removePluginFromTree(array &$tree, string $plugin): void
+    {
+        foreach ($tree as $_plugin => &$item) {
+            if ($_plugin === $plugin) {
+                unset($tree[$_plugin]);
+                break;
+            }
+
+            if (is_array($tree[$_plugin])) {
+                self::removePluginFromTree($tree[$_plugin], $plugin);
+            }
+        }
+    }
+
+    /**
+     * @param array $tree
+     * @return array
+     */
+    private static function getActivePluginsListFromTree(array $tree): array
+    {
+        $active_plugins = [];
+
+        foreach ($tree as $plugin => $item) {
+            $active_plugins[] = $plugin;
+            if (is_array($item)) {
+                $child_tree = self::getActivePluginsListFromTree($item);
+                if (!empty($child_tree)) {
+                    array_push(
+                        $active_plugins,
+                        ...$child_tree
+                    );
+                }
+            }
+        }
+        array_unique($active_plugins);
+        return $active_plugins;
+    }
+
     /**
      * @return void
      */
@@ -260,7 +339,7 @@ class Plugins
                 static function () {
                     return [];
                 },
-                PHP_INT_MAX - 10
+                PHP_INT_MAX
             );
 
             $this->unsetTheme();
@@ -268,14 +347,11 @@ class Plugins
             return;
         }
 
-        $tree = [];
-        $active_plugins = [];
-
         $config = $this->getConfig();
 
         foreach ($config as $plugin => &$data) {
             if (!$this->isPluginActive($plugin)
-                || in_array($plugin, $active_plugins, true)
+                || $this->inTree($plugin)
             ) {
                 continue;
             }
@@ -283,8 +359,7 @@ class Plugins
             $status = $data['status'] ?? self::STATUS_SYSTEM_DEFAULT;
 
             if ($status === self::STATUS_FORCE_ENABLED) {
-                $tree[$plugin] = [];
-                $active_plugins[] = $plugin;
+                $this->tree[$plugin] = [];
                 continue;
             }
 
@@ -294,13 +369,12 @@ class Plugins
 
             if (in_array($status, [self::STATUS_SMART, self::STATUS_ENABLE_WHEN, self::STATUS_DISABLE_WHEN], true)) {
                 if ($status === self::STATUS_DISABLE_WHEN) {
-                    $active_plugins[] = $plugin;
+                    $this->tree[$plugin] = [];
                 }
 
                 $rules = array_values($data['rules'] ?? []);
                 $rules_patterns = array_values($data['rules_patterns'] ?? []);
                 $force_required = $data['force_required'] ?? false;
-
 
                 if (
                     $force_required ||
@@ -319,26 +393,19 @@ class Plugins
                         )
                     )
                 ) {
-                    /**
-                     * Only when status is DISABLE_WHEN
-                     * @see STATUS_DISABLE_WHEN
-                     * */
-                    if (!in_array($plugin, $active_plugins, true)) {
-                        $active_plugins[] = $plugin;
-                    }
-
                     if ($force_required) {
                         $demanding_from = &$data['demanding_from'][$plugin];
                     } else {
-                        $demanding_from = &$tree[$plugin];
+                        $demanding_from = &$this->tree[$plugin];
                     }
 
                     $required = $data['require'] ?? [];
+
                     foreach ($required as $_plugin) {
                         if (
                             $_plugin !== $plugin
                             && $this->isPluginActive($_plugin)
-                            && !in_array($_plugin, $active_plugins, true)
+                            && !$this->inTree($_plugin)
                         ) {
                             $_config = $config[$_plugin];
                             $_config['force_required'] = true;
@@ -350,15 +417,16 @@ class Plugins
                     continue;
                 }
             } else {
-                $tree[$plugin] = [];
+                $this->tree[$plugin] = [];
             }
 
             if ($status === self::STATUS_DISABLE_WHEN) {
-                unset($active_plugins[array_search($plugin, $active_plugins, true)]);
+                self::removePluginFromTree($this->tree, $plugin);
             }
         }
         unset($data);
 
+        $orig_tree = $this->tree;
 
         if (
             ($this->parent->getConfig()['debug']['active'] ?? false) &&
@@ -369,10 +437,10 @@ class Plugins
             foreach ($params as $encoded_plugin) {
                 $decoded_plugin = base64_decode($encoded_plugin);
                 if ($this->plugins[$decoded_plugin] ?? false) {
-                    if (in_array($decoded_plugin, $active_plugins, true)) {
-                        unset($active_plugins[array_search($decoded_plugin, $active_plugins, true)]);
+                    if ($this->inTree($decoded_plugin)) {
+                        self::removePluginFromTree($this->tree, $decoded_plugin);
                     } else {
-                        $active_plugins[] = $decoded_plugin;
+                        $this->tree[$decoded_plugin] = [];
                     }
                 }
             }
@@ -381,12 +449,11 @@ class Plugins
              * */
             add_action(
                 'wp_before_admin_bar_render',
-                function () use ($active_plugins, $params) {
+                function () use ($params, $orig_tree) {
                     global $wp_admin_bar;
 
-
                     foreach ($this->plugins as $plugin => $data) {
-                        $active = in_array($plugin, $active_plugins, true);
+                        $active = $this->inTree($plugin);
                         $title = $data['Name'] ?? $plugin;
 
                         $_params = $params;
@@ -413,16 +480,20 @@ class Plugins
                             ]
                         );
                     }
+
+                    $this->adminBarTree($this->tree);
                 },
                 100
             );
         }
 
-        $this->active_plugins = $active_plugins;
-
         if ($this->parent->authorizedDebug()) {
             $debug = '<h1>Active Plugins Tree</h1>';
-            $debug .= '<pre>' . $this->printPluginsTree($tree) . '</pre>';
+            //self::removePluginFromTree($this->tree, 'test_plugin_1.php');
+            echo "<pre>";
+//            echo $this->inTree('test_plugin_1.php');
+            echo "</pre>";
+            $debug .= '<pre>' . $this->printPluginsTree($this->tree) . '</pre>';
             wp_die($debug);
         }
 
@@ -437,6 +508,33 @@ class Plugins
         );
     }
 
+    private function adminBarTree($tree, $level = 0): void
+    {
+        global $wp_admin_bar;
+        foreach ($tree as $plugin => $item) {
+            $_level = $level;
+            $title = str_repeat('-',$_level).($this->plugins[$plugin]['Name'] ?? $plugin);
+            $wp_admin_bar->add_node(
+                [
+                    'id' => $this->getName() . '-' . 'tree-' . $plugin,
+                    'parent' => $this->getName() . '-tree',
+                    'title' => HTML::tag(
+                        'span',
+                        $title,
+                        [
+                            // 'style' => 'color:' . ($active ? 'green' : 'red')
+                        ]
+                    ),
+                    'href' => '#'
+                ]
+            );
+            if (is_array($item)) {
+                $_level++;
+                $this->adminBarTree($item,$_level);
+            }
+        }
+    }
+
     /**
      * @return array
      */
@@ -447,7 +545,7 @@ class Plugins
          * */
         remove_filter('option_active_plugins', [$this, 'overwriteActivePlugins'], PHP_INT_MAX);
 
-        return $this->active_plugins;
+        return self::getActivePluginsListFromTree($this->tree);
     }
 
     /**

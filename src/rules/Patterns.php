@@ -71,504 +71,507 @@ class Patterns
             function ($config) {
                 $this->overwritePatterns($config['patterns'], $this->predefinedPatterns());
                 //$this->overwritePatterns($config['patterns'], $this->getRegistered());
-                $this->overwritePatterns($config['patterns'], [
+                $this->overwritePatterns(
+                    $config['patterns'],
                     [
-                        'label' => 'BL: pages/homepage',
-                        'name'  => 'bl_pages/homepage',
-                        'rules' =>
-                            [
+                        [
+                            'label' => 'BL: pages/homepage',
+                            'name' => 'bl_pages/homepage',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'equal',
-                                                'value'   => '/',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
-                                            ],
-                                        ],
-                                    'logic' => 'and',
-                                ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: post/docs',
-                        'name'  => 'bl_post/docs',
-                        'rules' =>
-                            [
-                                [
-                                    'rule'  =>
-                                        [
-                                            [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(docs|dc|d)($|(\/.*))#',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'equal',
+                                                    'value' => '/',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
                                                 ],
-                                                'logic'   => 'and',
-                                            ]
-                                        ],
-                                    'logic' => 'and',
-                                ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: ajax/adsl_get_fragments',
-                        'name'  => 'bl_ajax/adsl_get_fragments',
-                        'rules' =>
-                            [
-                                [
-                                    'rule'  =>
-                                        [
-                                            [
-                                                'type'    => 'function',
-                                                'key'     => 'defined',
-                                                'compare' => 'equal',
-                                                'value'   => '1',
-                                                'params'  => [ 'DOING_AJAX' ],
-                                                'logic'   => 'and',
                                             ],
-                                            [
-                                                'type'    => 'request',
-                                                'key'     => 'action',
-                                                'compare' => 'equal',
-                                                'value'   => 'adsl_get_fragments',
-                                                'params'  => [],
-                                                'logic'   => 'and',
-                                            ]
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: ajax/woocommerce_get_refreshed_fragments',
-                        'name'  => 'bl_ajax/woocommerce_get_refreshed_fragments',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: post/docs',
+                            'name' => 'bl_post/docs',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'defined',
-                                                'compare' => 'equal',
-                                                'value'   => '1',
-                                                'params'  => [ 'DOING_AJAX' ],
-                                                'logic'   => 'and',
-                                            ],
-                                            [
-                                                'type'    => 'request',
-                                                'key'     => 'action',
-                                                'compare' => 'equal',
-                                                'value'   => 'woocommerce_get_refreshed_fragments',
-                                                'params'  => [],
-                                                'logic'   => 'and',
-                                            ]
-                                        ],
-                                    'logic' => 'and',
-                                ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: ajax/get_refreshed_fragments',
-                        'name'  => 'bl_ajax/get_refreshed_fragments',
-                        'rules' =>
-                            [
-                                [
-                                    'rule'  =>
-                                        [
-                                            [
-                                                'type'    => 'request',
-                                                'key'     => 'wc-ajax',
-                                                'compare' => 'equal',
-                                                'value'   => 'get_refreshed_fragments',
-                                                'params'  => [],
-                                                'logic'   => 'and',
-                                            ]
-                                        ],
-                                    'logic' => 'and',
-                                ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: post/wiki',
-                        'name'  => 'bl_post/wiki',
-                        'rules' =>
-                            [
-                                [
-                                    'rule'  =>
-                                        [
-                                            [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(wiki|wc|w)($|(\/.*))#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(docs|dc|d)($|(\/.*))#',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ],
+                                                    'logic' => 'and',
                                                 ]
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: url/shop/*',
-                        'name'  => 'bl_url/shop/*',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: ajax/adsl_get_fragments',
+                            'name' => 'bl_ajax/adsl_get_fragments',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'starts_with',
-                                                'value'   => '/shop/',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'defined',
+                                                    'compare' => 'equal',
+                                                    'value' => '1',
+                                                    'params' => ['DOING_AJAX'],
+                                                    'logic' => 'and',
+                                                ],
+                                                [
+                                                    'type' => 'request',
+                                                    'key' => 'action',
+                                                    'compare' => 'equal',
+                                                    'value' => 'adsl_get_fragments',
+                                                    'params' => [],
+                                                    'logic' => 'and',
                                                 ]
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: post/info',
-                        'name'  => 'bl_post/info',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: ajax/woocommerce_get_refreshed_fragments',
+                            'name' => 'bl_ajax/woocommerce_get_refreshed_fragments',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(info|i)($|(\/.*))#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'defined',
+                                                    'compare' => 'equal',
+                                                    'value' => '1',
+                                                    'params' => ['DOING_AJAX'],
+                                                    'logic' => 'and',
+                                                ],
+                                                [
+                                                    'type' => 'request',
+                                                    'key' => 'action',
+                                                    'compare' => 'equal',
+                                                    'value' => 'woocommerce_get_refreshed_fragments',
+                                                    'params' => [],
+                                                    'logic' => 'and',
                                                 ]
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: post/articles/archive',
-                        'name'  => 'bl_post/articles/archive',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: ajax/get_refreshed_fragments',
+                            'name' => 'bl_ajax/get_refreshed_fragments',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(article|ac)($|(\/.*))#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
+                                                [
+                                                    'type' => 'request',
+                                                    'key' => 'wc-ajax',
+                                                    'compare' => 'equal',
+                                                    'value' => 'get_refreshed_fragments',
+                                                    'params' => [],
+                                                    'logic' => 'and',
                                                 ]
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: post/help',
-                        'name'  => 'bl_post/help',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: post/wiki',
+                            'name' => 'bl_post/wiki',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(help|hc|h)($|(\/.*))#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(wiki|wc|w)($|(\/.*))#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: wp-admin/product-list',
-                        'name'  => 'bl_wp-admin/product-list',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: url/shop/*',
+                            'name' => 'bl_url/shop/*',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'starts_with',
-                                                'value'   => '/wp-admin/edit.php?post_type=product',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'starts_with',
+                                                    'value' => '/shop/',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/product',
-                        'name'  => 'bl_pages/product',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: post/info',
+                            'name' => 'bl_post/info',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(p)($|(\/.*))#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(info|i)($|(\/.*))#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: wp-admin/uxbuilder',
-                        'name'  => 'bl_wp-admin/uxbuilder',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: post/articles/archive',
+                            'name' => 'bl_post/articles/archive',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?((wp-admin/edit\.php\?page=uxbuilder)|(post\.php\?post=asd.*?app=uxbuilder))#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(article|ac)($|(\/.*))#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/frontend',
-                        'name'  => 'bl_pages/frontend',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: post/help',
+                            'name' => 'bl_post/help',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#^\/?(wp-admin|wp-cron\.php|wp-json)($|(\/.*))#',
-                                                'logic'   => 'not',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(help|hc|h)($|(\/.*))#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
+                        ],
+                        [
+                            'label' => 'BL: wp-admin/product-list',
+                            'name' => 'bl_wp-admin/product-list',
+                            'rules' =>
+                                [
+                                    [
+                                        'rule' =>
+                                            [
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'starts_with',
+                                                    'value' => '/wp-admin/edit.php?post_type=product',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
+                                            ],
+                                        'logic' => 'and',
+                                    ],
+                                ],
+                        ],
+                        [
+                            'label' => 'BL: pages/product',
+                            'name' => 'bl_pages/product',
+                            'rules' =>
+                                [
+                                    [
+                                        'rule' =>
+                                            [
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(p)($|(\/.*))#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
+                                            ],
+                                        'logic' => 'and',
+                                    ],
+                                ],
+                        ],
+                        [
+                            'label' => 'BL: wp-admin/uxbuilder',
+                            'name' => 'bl_wp-admin/uxbuilder',
+                            'rules' =>
+                                [
+                                    [
+                                        'rule' =>
+                                            [
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?((wp-admin/edit\.php\?page=uxbuilder)|(post\.php\?post=asd.*?app=uxbuilder))#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
+                                            ],
+                                        'logic' => 'and',
+                                    ],
+                                ],
+                        ],
+                        [
+                            'label' => 'BL: pages/frontend',
+                            'name' => 'bl_pages/frontend',
+                            'rules' =>
+                                [
+                                    [
+                                        'rule' =>
+                                            [
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#^\/?(wp-admin|wp-cron\.php|wp-json)($|(\/.*))#',
+                                                    'logic' => 'not',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
+                                            ],
+                                        'logic' => 'and',
+                                    ],
+                                ],
+                        ],
 
 
-                    [
-                        'label' => 'BL: pages/archive',
-                        'name'  => 'bl_pages/archive',
-                        'rules' =>
-                            [
+                        [
+                            'label' => 'BL: pages/archive',
+                            'name' => 'bl_pages/archive',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#/shop/$#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#/shop/$#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/my-account',
-                        'name'  => 'bl_pages/my-account',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: pages/my-account',
+                            'name' => 'bl_pages/my-account',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#/my-account/?$#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#/my-account/?$#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/shopping-lists',
-                        'name'  => 'bl_pages/shopping-lists',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: pages/shopping-lists',
+                            'name' => 'bl_pages/shopping-lists',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#/shopping-lists/?$#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#/shopping-lists/?$#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/contact-us',
-                        'name'  => 'bl_pages/contact-us',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: pages/contact-us',
+                            'name' => 'bl_pages/contact-us',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#/contact-us/?$#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#/contact-us/?$#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/cart',
-                        'name'  => 'bl_pages/cart',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: pages/cart',
+                            'name' => 'bl_pages/cart',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#/shop/basket/?$#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#/shop/basket/?$#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                    [
-                        'label' => 'BL: pages/checkout',
-                        'name'  => 'bl_pages/checkout',
-                        'rules' =>
-                            [
+                        ],
+                        [
+                            'label' => 'BL: pages/checkout',
+                            'name' => 'bl_pages/checkout',
+                            'rules' =>
                                 [
-                                    'rule'  =>
-                                        [
+                                    [
+                                        'rule' =>
                                             [
-                                                'type'    => 'function',
-                                                'key'     => 'parse_url',
-                                                'compare' => 'regexp',
-                                                'value'   => '#/shop/checkout/?$#',
-                                                'logic'   => 'and',
-                                                'params'  => [
-                                                    '{{$_SERVER->REQUEST_URI}}',
-                                                    '{{@PHP_URL_PATH}}'
-                                                ]
+                                                [
+                                                    'type' => 'function',
+                                                    'key' => 'parse_url',
+                                                    'compare' => 'regexp',
+                                                    'value' => '#/shop/checkout/?$#',
+                                                    'logic' => 'and',
+                                                    'params' => [
+                                                        '{{$_SERVER->REQUEST_URI}}',
+                                                        '{{@PHP_URL_PATH}}'
+                                                    ]
+                                                ],
                                             ],
-                                        ],
-                                    'logic' => 'and',
+                                        'logic' => 'and',
+                                    ],
                                 ],
-                            ],
-                    ],
-                ]);
+                        ],
+                    ]
+                );
 
                 return $config;
             }
         );
 
 
-        $this->config = Option::expandOptions($this->settings, $this->getName());
+        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true]);
 
         if (is_admin()) {
             $this->adminInit();
@@ -684,6 +687,9 @@ class Patterns
         Option::setOption('registered_patterns', $this->getName(), $registered_patterns);
     }
 
+    /**
+     * @return array
+     */
     public function getRegistered(): array
     {
         return Option::getOption('registered_patterns', $this->getName(), []);
@@ -813,6 +819,7 @@ class Patterns
 
     /**
      * @return void
+     * @throws \Exception
      */
     public function tabContent(): void
     {
@@ -820,7 +827,8 @@ class Patterns
             $this->getName(),
             $this->settings,
             [
-                'wrap_params' => ['style' => 'width:100%;max-width:calc( 100% - 20px );']
+                'wrap_params' => ['style' => 'width:100%;max-width:calc( 100% - 20px );'],
+                'serialize' => true
             ]
         );
     }

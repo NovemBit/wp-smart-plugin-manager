@@ -90,7 +90,7 @@ class Rules
             ],
         ];
 
-        $this->config = Option::expandOptions($this->settings, $this->getName());
+        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true,]);
 
         $this->patterns = new Patterns($this);
 
@@ -175,7 +175,14 @@ class Rules
      */
     public function defaultTabContent(): void
     {
-        Option::printForm($this->getName(), $this->settings, ['title' => 'Rules configuration']);
+        Option::printForm(
+            $this->getName(),
+            $this->settings,
+            [
+                'title' => 'Rules configuration',
+                'serialize' => true
+            ]
+        );
     }
 
     /**

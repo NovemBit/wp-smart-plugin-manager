@@ -160,7 +160,7 @@ class Bootstrap
             ]
         ];
 
-        $this->config = Option::expandOptions($this->settings, $this->getName());
+        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true,]);
 
         if (is_admin()) {
             $this->adminInit();
@@ -261,7 +261,7 @@ class Bootstrap
      */
     public function adminContent(): void
     {
-        Option::printForm($this->getName(), $this->settings);
+        Option::printForm($this->getName(), $this->settings,['serialize' => true]);
     }
 
     /**
@@ -269,6 +269,12 @@ class Bootstrap
      */
     public function install(): bool
     {
+        if (!file_exists(WPMU_PLUGIN_DIR)
+            && !mkdir($concurrentDirectory = WPMU_PLUGIN_DIR, 0777, true)
+            && !is_dir($concurrentDirectory)
+        ) {
+            throw new \RuntimeException(sprintf('Directory "%s" was not created', $concurrentDirectory));
+        }
         $mu = WPMU_PLUGIN_DIR . '/' . $this->getName() . '.php';
         $content = '<?php' . PHP_EOL;
         $content .= ' // This is auto generated file' . PHP_EOL;

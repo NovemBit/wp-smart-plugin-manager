@@ -295,6 +295,7 @@ class Rules
                 $type = $_rules['type'] ?? null;
                 $key = self::extractVariables($_rules['key'] ?? null);
                 $value = self::extractVariables($_rules['value'] ?? null);
+                $params = $_rules['params'] ?? [];
                 $compare = $_rules['compare'] ?? null;
 
                 if (!$type || !$key) {
@@ -304,13 +305,17 @@ class Rules
                 if (in_array($type, [self::TYPE_REQUEST, self::TYPE_GET, self::TYPE_POST, self::TYPE_SERVER], true)) {
                     $_value = call_user_func([Environment::class, $type], $key);
                 } elseif ($type === self::TYPE_HOOK) {
-                    $_value = apply_filters($key, null);
+                    $_value = apply_filters($key, $params);
                 } elseif ($type === self::TYPE_FUNCTION && function_exists($key)) {
-                    $params = $_rules['params'] ?? [];
+
                     $_value = $key(...self::extractAllVariables($params));
                 } else {
                     continue;
                 }
+
+                $_value = apply_filters($this->getName() . '-assertion-' . $type . '-value', $_value, $params);
+                $_value = apply_filters($this->getName() . '-assertion-value', $_value, $type, $key, $params);
+
                 $assertion = Variables::compare($compare, $_value, $value);
             }
 

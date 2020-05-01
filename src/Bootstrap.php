@@ -6,6 +6,8 @@ use diazoxide\helpers\Environment;
 use diazoxide\helpers\HTML;
 use diazoxide\helpers\URL;
 use diazoxide\wp\lib\option\v2\Option;
+use NovemBit\wp\plugins\spm\helpers\Helpers;
+use NovemBit\wp\plugins\spm\integrations\Integrations;
 use NovemBit\wp\plugins\spm\plugins\Plugins;
 use NovemBit\wp\plugins\spm\rules\Rules;
 use WP_Admin_Bar;
@@ -26,18 +28,35 @@ class Bootstrap
     public $rules;
 
     /**
+     * @var Integrations
+     * */
+    public $integrations;
+
+
+    /**
+     * @var Helpers
+     * */
+    public $helpers;
+    /**
      * @var self
      * */
     private static $instance;
 
+    /**
+     * @var string
+     * */
     private $plugin_file;
 
+    /**
+     * @var array
+     * */
     private $settings;
 
     /**
      * @var array
      * */
     private $config;
+
 
     /**
      * @param string|null $plugin_file
@@ -173,6 +192,8 @@ class Bootstrap
          * */
         add_action('admin_bar_menu', [$this, 'adminBarMenu'], 100);
 
+        $this->helpers = new Helpers($this);
+        $this->integrations = new Integrations($this);
         $this->rules = new Rules($this);
         $this->plugins = new Plugins($this);
     }
@@ -261,7 +282,7 @@ class Bootstrap
      */
     public function adminContent(): void
     {
-        Option::printForm($this->getName(), $this->settings,['serialize' => true]);
+        Option::printForm($this->getName(), $this->settings, ['serialize' => true]);
     }
 
     /**

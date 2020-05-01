@@ -436,7 +436,7 @@ class Plugins
              * */
             add_action(
                 'wp_before_admin_bar_render',
-                function () use ($params, $orig_tree) {
+                function ()  {
                     $this->adminBarTree($this->tree);
 
                     global $wp_admin_bar;

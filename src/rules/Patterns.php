@@ -165,12 +165,11 @@ class Patterns
                                 'rule' =>
                                     [
                                         [
-                                            'type' => $this->parent::TYPE_FUNCTION,
-                                            'key' => 'parse_url',
+                                            'type' => $this->parent::TYPE_HOOK,
+                                            'key' => $this->parent->parent->helpers->getHookName('RequestPath'),
                                             'compare' => Variables::COMPARE_REGEXP,
                                             'value' => '#' . $rule . '#',
-                                            'logic' => $this->parent::LOGIC_AND,
-                                            'params' => ['{{$_SERVER->REQUEST_URI}}', '{{@PHP_URL_PATH}}']
+                                            'logic' => $this->parent::LOGIC_AND
                                         ],
                                     ],
                                 'logic' => $this->parent::LOGIC_AND,

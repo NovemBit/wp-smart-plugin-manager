@@ -3,57 +3,41 @@
 
 namespace NovemBit\wp\plugins\spm\plugins;
 
-use diazoxide\helpers\Arrays;
 use diazoxide\helpers\Environment;
 use diazoxide\helpers\HTML;
 use diazoxide\helpers\URL;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
+use Exception;
 use NovemBit\wp\plugins\spm\Bootstrap;
+use NovemBit\wp\plugins\spm\rules\Patterns;
+use NovemBit\wp\plugins\spm\rules\Rules;
+use NovemBit\wp\plugins\spm\system\Component;
 
-class Plugins
+/**
+ * @property Bootstrap $parent
+ *
+ * */
+class Plugins extends Component
 {
-
-    /**
-     * @var Bootstrap
-     * */
-    public $parent;
-
-    /**
-     * @var array
-     * */
-    private $settings;
 
     /**
      * @var $config
      * */
-    private $config;
+    private static $config;
 
     /**
      * @var array
      * */
-    private $plugins;
+    private static $settings;
 
     /**
      * @var array
      * */
     private $orig_active_plugins;
 
-    /**
-     * @var array
-     * */
     private $active_plugins = [];
 
-    private $tree = [];
-    /**
-     * Statuses
-     * */
-    public const STATUS_SYSTEM_DEFAULT = 'default';
-    public const STATUS_FORCE_DISABLED = 'force_disabled';
-    public const STATUS_FORCE_ENABLED = 'force_enabled';
-    public const STATUS_ENABLE_WHEN = 'enable_when';
-    public const STATUS_DISABLE_WHEN = 'disable_when';
-    public const STATUS_SMART = 'smart';
 
     /**
      * Actions
@@ -63,124 +47,137 @@ class Plugins
     /**
      * @return string
      */
-    public function getName(): string
+    public static function getName(): string
     {
-        return $this->parent->getName() . '-plugins';
+        return Bootstrap::getName() . '-plugins';
+    }
+
+    public static function getSettings(): array
+    {
+        if (!isset(self::$settings)) {
+            self::$settings = [];
+            $plugins = Bootstrap::instance()->getAllPlugins();
+
+            foreach ($plugins as $file => $plugin_data) {
+                add_filter(
+                    'wp-lib-option/' . self::getName() . '/form-nested-label',
+                    [self::class, 'setNestedFieldName'],
+                    10,
+                    1
+                );
+
+                add_filter(
+                    'wp-lib-option/' . self::getName() . '/form-before-nested-fields',
+                    [self::class, 'setBeforeNestedFields'],
+                    10,
+                    2
+                );
+
+                $plugins_list = $plugins;
+                unset($plugins_list[$file]);
+                self::$settings[$file] = [
+                    'name' => $plugin_data['Name'] ?? $file,
+                    'patterns' => Bootstrap::instance()->isEnabledPatterns() ? new Option(
+                        [
+                            'label' => 'Patterns',
+                            'method' => Option::METHOD_MULTIPLE,
+                            'relation' => [
+                                'parent' => Patterns::getName(),
+                                'with' => [Patterns::class, 'getSettings'],
+                                'name' => 'patterns',
+                                'key' => 'name',
+                                'label' => 'label',
+                            ],
+                            'before_set_value' => static function (Option $option, &$value) use ($file) {
+                                $map = Option::getOption('_asd_relation_map', '_asd', [], true);
+                                foreach ($value as $item) {
+                                    $row = [$file, $item];
+                                    if (!in_array($row, $map, true)) {
+                                        $map[] = $row;
+                                    }
+                                }
+                                foreach ($map as $key => $row) {
+                                    if (($row[0] === $file) && !in_array($row[1], $value, true)) {
+                                        unset($map[$key]);
+                                    }
+                                }
+                                Option::setOption('_asd_relation_map', '_asd', $map, true);
+                                return false;
+                            },
+                            'before_get_value' => static function (Option $option, &$value) use ($file) {
+                                $map = Option::getOption('_asd_relation_map', '_asd', [], true);
+                                $value = [];
+                                foreach ($map as $item) {
+                                    if ($item[0] === $file) {
+                                        $value[] = $item[1];
+                                    }
+                                }
+                            },
+                            'main_params' => ['col' => 1],
+                        ]
+                    ) : [],
+                    'rules' => Bootstrap::instance()->isEnabledCustomRules() ? new Option(
+                        [
+                            'default' => [],
+                            'method' => Option::METHOD_MULTIPLE,
+                            'type' => Option::TYPE_GROUP,
+                            'values' => [],
+                            'main_params' => ['col' => '1'],
+                            'template' => Rules::getRulesSettings(),
+                            'label' => 'Rules'
+                        ]
+                    ) : [],
+                ];
+            }
+
+            /**
+             * Sort plugins
+             * Actives first
+             * */
+            uksort(
+                self::$settings,
+                static function ($a, $b) {
+                    if (Bootstrap::instance()->isPluginActive($a)) {
+                        return 0;
+                    }
+                    return 1;
+                }
+            );
+        }
+
+        return self::$settings;
+    }
+
+    public static function getConfig(): array
+    {
+        if (!isset(self::$config)) {
+            self::$config = Option::expandOptions(
+                self::getSettings(),
+                self::getName(),
+                ['serialize' => true, 'single_option' => true]
+            );
+        }
+        return self::$config;
     }
 
     /**
      * Plugins constructor.
-     * @param Bootstrap $parent
      * @uses setBeforeNestedFields
      * @uses handleRequestActions
      * @uses setNestedFieldName
      */
-    public function __construct(Bootstrap $parent)
+    public function init(): void
     {
-        $this->parent = $parent;
-
-        include_once ABSPATH . 'wp-admin/includes/plugin.php';
-
-        $this->setAllPlugins();
-
         add_action('init', [$this, 'handleRequestActions']);
 
-        $this->settings = [];
-
-        $plugins = $this->getPluginsMap();
-
-        foreach ($plugins as $file => $name) {
-            add_filter(
-                'wp-lib-option/' . $this->getName() . '/form-nested-label',
-                [$this, 'setNestedFieldName'],
-                10,
-                1
-            );
-
-            add_filter(
-                'wp-lib-option/' . $this->getName() . '/form-before-nested-fields',
-                [$this, 'setBeforeNestedFields'],
-                10,
-                2
-            );
-
-            $plugins_list = $plugins;
-            unset($plugins_list[$file]);
-            $this->settings[$file] = [
-                'status' => new Option(
-                    [
-                        'default' => self::STATUS_DISABLE_WHEN,
-                        'label' => 'Status',
-                        'values' => [
-                            self::STATUS_SYSTEM_DEFAULT => 'System default',
-                            self::STATUS_FORCE_DISABLED => 'Force disabled',
-                            self::STATUS_FORCE_ENABLED => 'Force enabled',
-                            self::STATUS_ENABLE_WHEN => 'Enable when',
-                            self::STATUS_DISABLE_WHEN => 'Disable when',
-                            self::STATUS_SMART => 'Smart control',
-                        ]
-                    ]
-                ),
-                /*'priority' => new Option(
-                    [
-                        'default' => 10,
-                        'label' => 'Priority',
-                        'markup' => Option::MARKUP_NUMBER,
-                    ]
-                ),*/
-                'require' => new Option(
-                    [
-                        'default' => [],
-                        'method' => Option::METHOD_MULTIPLE,
-                        'values' => $plugins_list,
-                        'label' => 'Required plugins'
-                    ]
-                ),
-                'rules_patterns' => new Option(
-                    [
-                        'label' => 'Predefined rule patterns',
-                        'method' => Option::METHOD_MULTIPLE,
-                        'type' => Option::TYPE_TEXT,
-                        'values' => $this->parent->rules->patterns->getPatternsMap(),
-                        'main_params' => ['col' => '1'],
-
-                    ]
-                ),
-                'rules' => ($this->parent->rules->config['common']['plugin_custom_rules'] ?? false) ? new Option(
-                    [
-                        'default' => [],
-                        'method' => Option::METHOD_MULTIPLE,
-                        'type' => Option::TYPE_GROUP,
-                        'values' => [],
-                        'main_params' => ['col' => '1'],
-                        'template' => $this->parent->rules::getRulesSettings(),
-                        'label' => 'Rules'
-                    ]
-                ) : [],
-            ];
-        }
-
-        /**
-         * Sort plugins
-         * Actives first
-         * */
-        uksort(
-            $this->settings,
-            function ($a, $b) {
-                if ($this->isPluginActive($a)) {
-                    return 0;
-                }
-                return 1;
-            }
-        );
-
-        /**
-         * Expand config from settings
-         * */
-        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true]);
-
         $this->initActivePlugins();
+    }
 
+    /**
+     * @return void
+     */
+    public function run(): void
+    {
         /**
          * @uses adminBarMenu
          * */
@@ -198,9 +195,9 @@ class Plugins
     {
         $admin_bar->add_menu(
             array(
-                'id' => $this->getName(),
-                'parent' => $this->parent->getName(),
-                'href' => admin_url('admin.php?page=' . $this->getName()),
+                'id' => self::getName(),
+                'parent' => Bootstrap::getName(),
+                'href' => admin_url('admin.php?page=' . self::getName()),
                 'title' => 'Plugins',
                 'meta' => array(
                     'title' => 'Plugins',
@@ -217,7 +214,7 @@ class Plugins
      */
     private function isPluginActive(string $plugin): bool
     {
-        return $this->plugins[$plugin]['custom_data']['is_active'] ?? false;
+        return $this->parent->getAllPlugins()[$plugin]['custom_data']['is_active'] ?? false;
     }
 
     /**
@@ -242,79 +239,15 @@ class Plugins
     }
 
     /**
-     * @param $tree
-     * @param $plugin
-     * @param $count
-     */
-    private static function inArrayKeysRecursive($tree, $plugin, &$count): void
-    {
-        foreach ($tree as $_plugin => $item) {
-            if ($_plugin === $plugin) {
-                $count++;
-            }
-            if (is_array($item)) {
-                self::inArrayKeysRecursive($item, $plugin, $count);
-            }
-        }
-    }
-
-    /**
-     * @param $plugin
-     * @return bool
-     */
-    private function inTree($plugin): bool
-    {
-        self::inArrayKeysRecursive($this->tree, $plugin, $count);
-        return $count > 0;
-    }
-
-    /**
-     * @param array $tree
-     * @param string $plugin
-     */
-    private static function removePluginFromTree(array &$tree, string $plugin): void
-    {
-        foreach ($tree as $_plugin => &$item) {
-            if ($_plugin === $plugin) {
-                unset($tree[$_plugin]);
-                break;
-            }
-            if (is_array($tree[$_plugin])) {
-                self::removePluginFromTree($tree[$_plugin], $plugin);
-            }
-        }
-    }
-
-    /**
-     * @param array $tree
-     * @return array
-     */
-    private static function getActivePluginsListFromTree(array $tree): array
-    {
-        $active_plugins = [];
-
-        foreach ($tree as $plugin => $item) {
-            $active_plugins[] = $plugin;
-            if (is_array($item)) {
-                $child_tree = self::getActivePluginsListFromTree($item);
-                if (!empty($child_tree)) {
-                    array_push(
-                        $active_plugins,
-                        ...$child_tree
-                    );
-                }
-            }
-        }
-        array_unique($active_plugins);
-        return $active_plugins;
-    }
-
-    /**
      * @return void
      */
     private function initActivePlugins(): void
     {
         $this->orig_active_plugins = get_option('active_plugins');
+
+        $this->active_plugins = $this->orig_active_plugins;
+
+        unset($this->active_plugins[array_search($this->parent::getSelfPlugin(), $this->active_plugins)]);
 
         if (Variables::compare(
             Variables::COMPARE_STARTS_WITH,
@@ -327,7 +260,7 @@ class Plugins
         if (Variables::compare(
             Variables::COMPARE_STARTS_WITH,
             Environment::server('REQUEST_URI'),
-            '/wp-admin/admin.php?page=' . $this->parent->getName()
+            '/wp-admin/admin.php?page=' . Bootstrap::getName()
         )) {
             /**
              * @uses cleanActivePlugins
@@ -339,143 +272,43 @@ class Plugins
             return;
         }
 
-        $config = $this->getConfig();
+        $config = self::getConfig();
 
-        foreach ($config as $plugin => &$data) {
-            if (!$this->isPluginActive($plugin)
-                || $this->inTree($plugin)
-            ) {
+        foreach ($config as $plugin => $data) {
+            if (!Bootstrap::instance()->isPluginActive($plugin)) {
                 continue;
             }
 
-            $status = $data['status'] ?? self::STATUS_SYSTEM_DEFAULT;
+            $rules = array_values($data['rules'] ?? []);
+            $patterns = array_values($data['patterns'] ?? []);
 
-            if ($status === self::STATUS_FORCE_ENABLED) {
-                $this->tree[$plugin] = [];
-                continue;
-            }
-
-            if ($status === self::STATUS_FORCE_DISABLED) {
-                continue;
-            }
-
-            if (in_array($status, [self::STATUS_SMART, self::STATUS_ENABLE_WHEN, self::STATUS_DISABLE_WHEN], true)) {
-                if ($status === self::STATUS_DISABLE_WHEN) {
-                    $this->tree[$plugin] = [];
-                }
-
-                $rules = array_values($data['rules'] ?? []);
-                $rules_patterns = array_values($data['rules_patterns'] ?? []);
-                $force_required = $data['force_required'] ?? false;
-
-                if (
-                    $force_required ||
-                    (
-                        $status === self::STATUS_ENABLE_WHEN
-                        && (
-                            $this->parent->rules->patterns->checkPatterns($rules_patterns)
-                            || $this->parent->rules->checkRules($rules)
-                        )
-                    ) ||
-                    (
-                        $status === self::STATUS_DISABLE_WHEN
-                        && !(
-                            $this->parent->rules->patterns->checkPatterns($rules_patterns)
-                            || $this->parent->rules->checkRules($rules)
-                        )
-                    )
-                ) {
-                    if ($force_required) {
-                        $demanding_from = &$data['demanding_from'][$plugin];
-                    } else {
-                        $demanding_from = &$this->tree[$plugin];
-                    }
-
-                    $required = $data['require'] ?? [];
-
-                    foreach ($required as $_plugin) {
-                        if (
-                            $_plugin !== $plugin
-                            && $this->isPluginActive($_plugin)
-                            && !$this->inTree($_plugin)
-                        ) {
-                            $_config = $config[$_plugin];
-                            $_config['force_required'] = true;
-                            $_config['demanding_from'] = &$demanding_from;
-                            unset($config[$_plugin]);
-                            $config[$_plugin] = $_config;
-                        }
-                    }
-                    continue;
-                }
-            } else {
-                $this->tree[$plugin] = [];
-            }
-
-            if ($status === self::STATUS_DISABLE_WHEN) {
-                self::removePluginFromTree($this->tree, $plugin);
+            if (($this->checkPatterns($patterns) || $this->checkRules($rules))) {
+                unset($this->active_plugins[array_search($plugin, $this->active_plugins, true)]);
             }
         }
-        unset($data);
-
-        $orig_tree = $this->tree;
 
         if (
-            ($this->parent->getConfig()['debug']['active'] ?? false) &&
-            ($this->parent->getConfig()['debug']['plugins_on_admin_bar'] ?? false)
+            ($this->parent::getConfig()['debug']['active'] ?? false) &&
+            ($this->parent::getConfig()['debug']['plugins_on_admin_bar'] ?? false)
         ) {
-            foreach ($this->plugins as $plugin => $params) {
-                $status = Environment::get(md5($this->getName() . $plugin));
-                if (($status === '0') && $this->inTree($plugin)) {
-                    self::removePluginFromTree($this->tree, $plugin);
+            foreach ($this->parent->getAllPlugins() as $plugin => $params) {
+                $status = Environment::get(self::getPluginHash($plugin));
+                if (($status === '0') && in_array($plugin, $this->active_plugins, true)) {
+                    unset($this->active_plugins[array_search($plugin, $this->active_plugins, true)]);
+                } elseif (($status === '1') && !in_array($plugin, $this->active_plugins, true)) {
+                    $this->active_plugins[] = $plugin;
                 }
             }
 
             /**
              * @uses adminToolbar
              * */
-            add_action(
-                'wp_before_admin_bar_render',
-                function ()  {
-                    $this->adminBarTree($this->tree);
-
-                    global $wp_admin_bar;
-
-                    foreach ($this->plugins as $plugin => $data) {
-                        $active = $this->inTree($plugin);
-                        if ($active) {
-                            continue;
-                        }
-                        $title = $data['Name'] ?? $plugin;
-
-                        $url_key = md5($this->getName() . $plugin);
-                        $url = URL::removeQueryVars(URL::getCurrent(), $url_key);
-                        //$url = URL::addQueryVars($url, $url_key, '1');
-
-                        $wp_admin_bar->add_node(
-                            [
-                                'id' => $this->getName() . '-' . $plugin,
-                                'parent' => $this->getName(),
-                                'title' => HTML::tag(
-                                    'span',
-                                    $title,
-                                    [
-                                        'style' => 'color:red'
-                                    ]
-                                ),
-
-                                'href' => $url
-                            ]
-                        );
-                    }
-                },
-                100
-            );
+            add_action('wp_before_admin_bar_render',[$this, 'adminBarPlugins']);
         }
 
         if ($this->parent->authorizedDebug()) {
-            $debug = '<h1>Active Plugins Tree</h1>';
-            $debug .= '<pre>' . $this->printPluginsTree($this->tree) . '</pre>';
+            $debug = '<h1>Active Plugins</h1>';
+            $debug .= '<pre>' . $this->printPluginsList($this->active_plugins) . '</pre>';
             wp_die($debug);
         }
 
@@ -486,38 +319,58 @@ class Plugins
     }
 
     /**
-     * @param $tree
-     * @param int $level
+     * @param $patterns
+     * @return bool
      */
-    private function adminBarTree(array $tree, int $level = 0): void
+    private function checkPatterns(array $patterns): bool
+    {
+        return Bootstrap::instance()->isEnabledPatterns() &&
+            $this->parent->rules->patterns->checkPatterns($patterns);
+    }
+
+    /**
+     * @param array $rules
+     * @return bool
+     */
+    private function checkRules(array $rules): bool
+    {
+        return Bootstrap::instance()->isEnabledCustomRules() && $this->parent->rules->checkRules($rules);
+    }
+
+    /**
+     * @param string $plugin
+     * @return string
+     */
+    private static function getPluginHash(string $plugin): string
+    {
+        return substr(md5(self::getName() . $plugin), 0, 10);
+    }
+
+    public function adminBarPlugins(): void
     {
         global $wp_admin_bar;
-        foreach ($tree as $plugin => $item) {
-            $_level = $level;
-            $title = str_repeat('-', $_level) . ($this->plugins[$plugin]['Name'] ?? $plugin);
+        foreach ($this->parent->getAllPlugins() as $plugin => $data) {
+            $active = in_array($plugin, $this->active_plugins, true);
+            $title = $this->parent->getAllPlugins()[$plugin]['Name'] ?? $plugin;
 
-            $url_key = md5($this->getName() . $plugin);
+            $url_key = self::getPluginHash($plugin);
             $url = URL::removeQueryVars(URL::getCurrent(), $url_key);
-            $url = URL::addQueryVars($url, $url_key, '0');
+            $url = URL::addQueryVars($url, $url_key, $active ? '0' : '1');
 
             $wp_admin_bar->add_node(
                 [
-                    'id' => $this->getName() . '-' . $plugin,
-                    'parent' => $this->getName(),
+                    'id' => self::getName() . '-' . $plugin,
+                    'parent' => self::getName(),
                     'title' => HTML::tag(
                         'span',
                         $title,
                         [
-                            'style' => 'color:green'
+                            'style' => 'color:' . ($active ? 'green' : 'red')
                         ]
                     ),
                     'href' => $url
                 ]
             );
-            if (is_array($item)) {
-                $_level++;
-                $this->adminBarTree($item, $_level);
-            }
         }
     }
 
@@ -531,7 +384,7 @@ class Plugins
          * */
         remove_filter('option_active_plugins', [$this, 'overwriteActivePlugins'], PHP_INT_MAX);
 
-        return self::getActivePluginsListFromTree($this->tree);
+        return $this->active_plugins;
     }
 
     /**
@@ -549,22 +402,15 @@ class Plugins
 
 
     /**
-     * @param $tree
-     * @param int $level
+     * @param array $plugins
      * @return string
      */
-    private function printPluginsTree($tree, $level = 0): string
+    private function printPluginsList(array $plugins): string
     {
         $html = '';
-        foreach ($tree as $plugin => $_tree) {
-            $_level = $level;
-            $prefix = str_repeat('――', $_level);
-            $plugin = $this->plugins[$plugin]['Name'] ?? $plugin;
-            $html .= $prefix . $plugin . PHP_EOL;
-            if (!empty($_tree)) {
-                $_level++;
-                $html .= $this->printPluginsTree($_tree, $_level);
-            }
+        foreach ($plugins as $plugin) {
+            $plugin = $this->parent->getAllPlugins()[$plugin]['Name'] ?? $plugin;
+            $html .= HTML::tag('p', $plugin);
         }
         return $html;
     }
@@ -574,8 +420,8 @@ class Plugins
      */
     public function handleRequestActions(): void
     {
-        if (isset($_GET[$this->getName()])
-            && wp_verify_nonce($_GET[$this->getName()], self::ACTION_PLUGIN_ACTIVATE)
+        if (isset($_GET[self::getName()])
+            && wp_verify_nonce($_GET[self::getName()], self::ACTION_PLUGIN_ACTIVATE)
         ) {
             $plugin = $_GET['plugin'] ?? null;
 
@@ -585,7 +431,7 @@ class Plugins
 
             $plugin = base64_decode($plugin);
 
-            $is_active = $this->isPluginActive($plugin);
+            $is_active = Bootstrap::instance()->isPluginActive($plugin);
 
             /**
              * @uses resetActivePlugins
@@ -599,38 +445,17 @@ class Plugins
     }
 
     /**
-     * @return string
-     */
-    private function getSelfPlugin(): string
-    {
-        return sprintf('%1$s/%1$s.php', $this->parent->getName());
-    }
-
-    /**
-     * Set All plugins
-     * @return void
-     */
-    private function setAllPlugins(): void
-    {
-        $this->plugins = get_plugins();
-        unset($this->plugins[$this->getSelfPlugin()]);
-        foreach ($this->plugins as $plugin => &$data) {
-            $data['custom_data']['is_active'] = is_plugin_active($plugin);
-        }
-    }
-
-    /**
      * @param $label
      * @return string
      */
-    public function setNestedFieldName($label): string
+    public static function setNestedFieldName($label): string
     {
         $plugin = $label;
-        $label = $this->plugins[$plugin]['Name'] ?? $label;
+        $label = Bootstrap::instance()->getAllPlugins()[$plugin]['Name'] ?? $label;
         $label .= ' (';
-        $label .= $this->plugins[$plugin]['Version'] ?? '?';
+        $label .= Bootstrap::instance()->getAllPlugins()[$plugin]['Version'] ?? '?';
         $label .= ') ';
-        $label .= $this->getPluginActiveStatusBadge($plugin, false);
+        $label .= self::getPluginActiveStatusBadge($plugin, false);
         return $label;
     }
 
@@ -639,13 +464,13 @@ class Plugins
      * @param $route
      * @return string
      */
-    public function setBeforeNestedFields($content, $route): string
+    public static function setBeforeNestedFields($content, $route): string
     {
         $html = '';
-        $plugin_data = $this->plugins[$route] ?? null;
+        $plugin_data = Bootstrap::instance()->getAllPlugins()[$route] ?? null;
         if ($plugin_data) {
-            $html .= $this->getPluginActions($route);
-            $html .= $this->getPluginInfo($plugin_data);
+            $html .= self::getPluginActions($route);
+            $html .= self::getPluginInfo($plugin_data);
         }
 
         $content = $html . $content;
@@ -656,21 +481,21 @@ class Plugins
      * @param string $plugin
      * @return string
      */
-    private function getPluginActions(string $plugin): string
+    private static function getPluginActions(string $plugin): string
     {
         global $wp;
 
         $current_url = add_query_arg($wp->query_vars, admin_url($wp->request));
         $current_url = add_query_arg(['plugin' => base64_encode($plugin)], $current_url);
-        $is_active = $this->isPluginActive($plugin);
+        $is_active = Bootstrap::instance()->isPluginActive($plugin);
         $label = __($is_active ? 'Deactivate' : 'Activate', 'novembit-spm');
-        $activate_url = wp_nonce_url($current_url, self::ACTION_PLUGIN_ACTIVATE, $this->getName());
+        $activate_url = wp_nonce_url($current_url, self::ACTION_PLUGIN_ACTIVATE, self::getName());
 
         ob_start();
         ?>
         <div class="plugin-actions">
             <a href="<?php echo $activate_url; ?>" class="button button-default">
-                <?php echo $this->getPluginActiveStatusBadge($plugin, false); ?>
+                <?php echo self::getPluginActiveStatusBadge($plugin, false); ?>
                 <?php echo $label; ?>
             </a>
         </div>
@@ -683,10 +508,10 @@ class Plugins
      * @param bool $with_label
      * @return string
      */
-    private function getPluginActiveStatusBadge(string $plugin, bool $with_label = true): string
+    private static function getPluginActiveStatusBadge(string $plugin, bool $with_label = true): string
     {
         $class = 'plugin-active-status-badge';
-        if ($this->isPluginActive($plugin)) {
+        if (Bootstrap::instance()->isPluginActive($plugin)) {
             $label = __('Activated', 'wordpress');
             $class .= ' activated';
         } else {
@@ -700,7 +525,7 @@ class Plugins
      * @param array $plugin_data
      * @return string
      */
-    private function getPluginInfo(array $plugin_data): string
+    private static function getPluginInfo(array $plugin_data): string
     {
         unset($plugin_data['custom_data']);
 
@@ -734,11 +559,11 @@ class Plugins
     public function adminMenu(): void
     {
         add_submenu_page(
-            $this->parent->getName(),
+            Bootstrap::getName(),
             __('Plugins', 'novembit-spm'),
             __('Plugins', 'novembit-spm'),
             'manage_options',
-            $this->getName(),
+            self::getName(),
             [$this, 'adminContent']
         );
     }
@@ -751,8 +576,8 @@ class Plugins
      */
     public function assignPatterns(string $plugin, array $patterns): void
     {
-        $option_name = $plugin . '>rules_patterns';
-        $option = Option::getOption($option_name, $this->getName(), []);
+        $option_name = $plugin . '>patterns';
+        $option = Option::getOption($option_name, self::getName(), []);
 
         if (!empty($patterns)) {
             array_push($option, ...$patterns);
@@ -760,46 +585,27 @@ class Plugins
 
         $option = array_unique($option);
 
-        Option::setOption($option_name, $this->getName(), $option);
-    }
-
-    /**
-     * @return array
-     */
-    public function getPluginsMap(): array
-    {
-        $result = [];
-
-        foreach ($this->plugins as $file => $data) {
-            $result[$file] = $data['Name'] ?? $file;
-        }
-        return $result;
+        Option::setOption($option_name, self::getName(), $option);
     }
 
     /**
      * Admin Content
      * @return void
+     * @throws Exception
      */
     public function adminContent(): void
     {
         Option::printForm(
-            $this->getName(),
-            $this->settings,
+            self::getName(),
+            self::getSettings(),
             [
                 'title' => 'Smart Plugin Manager - Plugins',
                 'ajax_submit' => true,
                 'auto_submit' => true,
-                'serialize' => true
+                'serialize' => true,
+                'single_option' => true
             ]
         );
-    }
-
-    /**
-     * @return array
-     */
-    public function getConfig(): array
-    {
-        return $this->config;
     }
 
     /**

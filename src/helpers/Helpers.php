@@ -4,8 +4,9 @@ namespace NovemBit\wp\plugins\spm\helpers;
 
 use diazoxide\helpers\Environment;
 use NovemBit\wp\plugins\spm\Bootstrap;
+use NovemBit\wp\plugins\spm\system\Component;
 
-class Helpers
+class Helpers extends Component
 {
     /**
      * @var Bootstrap
@@ -17,20 +18,18 @@ class Helpers
         'RequestUri'
     ];
 
-    public function getName(): string
+    public static function getName(): string
     {
-        return $this->parent->getName() . '-helpers';
+        return Bootstrap::getName() . '-helpers';
     }
 
     public function getHookName(string $helper): string
     {
-        return $this->getName() . '-' . $helper;
+        return self::getName() . '-' . $helper;
     }
 
-    public function __construct(Bootstrap $parent)
+    public function run():void
     {
-        $this->parent = $parent;
-
         foreach ($this->helpers as $helper) {
             add_filter(
                 $this->getHookName($helper),
@@ -47,5 +46,10 @@ class Helpers
     public function callbackRequestUri():string
     {
         return Environment::server('REQUEST_URI');
+    }
+
+    protected function init(): void
+    {
+        // TODO: Implement init() method.
     }
 }

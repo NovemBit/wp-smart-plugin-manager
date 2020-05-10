@@ -7,86 +7,152 @@ namespace NovemBit\wp\plugins\spm\rules;
 use diazoxide\helpers\Arrays;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
+use NovemBit\wp\plugins\spm\plugins\Plugins;
+use NovemBit\wp\plugins\spm\system\Component;
 
-class Patterns
+/**
+ * @property Rules $parent
+ * */
+class Patterns extends Component
 {
-    /**
-     * @var Rules
-     * */
-    public $parent;
 
     /**
      * @var array
      * */
-    public $settings;
+    private static $settings;
 
     /**
      * @var array
      * */
-    public $config;
+    public static $config;
+
+    public static function getSettings(): array
+    {
+        if (!isset(self::$settings)) {
+            self::$settings = [
+                'patterns' => new Option(
+                    [
+                        'default' => [],
+                        'method' => Option::METHOD_MULTIPLE,
+                        'type' => Option::TYPE_GROUP,
+                        'values' => [],
+                        'main_params' => ['col' => 2],
+                        'before_set_value' => static function (Option $option, &$value) {
+                            $map = Option::getOption('_asd_relation_map', '_asd', [], true);
+                            foreach ($value as $group){
+
+                                foreach ($group['plugins'] as $item) {
+                                    $row = [$item, $group['name']];
+                                    if (!in_array($row, $map, true)) {
+                                        $map[] = $row;
+                                    }
+                                }
+
+                                foreach ($map as $key => $row) {
+                                    if (($row[1] === $group['name']) && !in_array($row[0], $group['plugins'], true)) {
+                                        unset($map[$key]);
+                                    }
+                                }
+                            }
+                            Option::setOption('_asd_relation_map', '_asd', $map, true);
+                            return false;
+                        },
+                        'before_get_value' => static function (Option $option, &$value) {
+                            $map = Option::getOption('_asd_relation_map', '_asd', [], true);
+                            foreach ($value as &$group) {
+                                $group['plugins'] = [];
+                                foreach ($map as $item) {
+                                    if ($item[1] === $group['name']) {
+                                        $group['plugins'][] = $item[0];
+                                    }
+                                }
+                            }
+                        },
+                        'template' => [
+                            'name' => [
+                                'label' => 'Name',
+                                'type' => Option::TYPE_TEXT,
+                                'required' => true,
+                                'main_params' => ['col' => 2]
+                            ],
+                            'label' => [
+                                'label' => 'Label',
+                                'type' => Option::TYPE_TEXT,
+                                'required' => true,
+                                'main_params' => ['col' => 2]
+                            ],
+                            'plugins' => [
+                                'method' => Option::METHOD_MULTIPLE,
+                                'label' => 'Plugins',
+                                'relation' => [
+                                    'parent' => Plugins::getName(),
+                                    'with' => [Plugins::class, 'getSettings'],
+                                    'name' => null,
+                                    'label' => 'name',
+                                ],
+                            ],
+                            'rules' => [
+                                'main_params' => ['col' => 2],
+                                'type' => Option::TYPE_GROUP,
+                                'method' => Option::METHOD_MULTIPLE,
+                                'template' => Rules::getRulesSettings()
+                            ],
+                        ],
+
+                        'label' => 'Patterns'
+                    ]
+                ),
+            ];
+        }
+        return self::$settings;
+    }
+
+
+    public static function getConfig(): array
+    {
+        if (!isset(self::$config)) {
+
+
+            self::$config = Option::expandOptions(
+                self::getSettings(),
+                self::getName(),
+                [
+                    'serialize' => true,
+                    'single_option' => true
+                ]
+            );
+
+        }
+        return self::$config;
+    }
 
     /**
      * Patterns constructor.
-     * @param Rules $parent
      */
-    public function __construct(Rules $parent)
+    public function init(): void
     {
-        $this->parent = $parent;
-
-        $this->settings = [
-            'patterns' => new Option(
-                [
-                    'default' => [],
-                    'method' => Option::METHOD_MULTIPLE,
-                    'type' => Option::TYPE_GROUP,
-                    'values' => [],
-                    'main_params' => ['col' => '2'],
-                    'template' => [
-                        'name' => [
-                            'label' => 'Name',
-                            'type' => Option::TYPE_TEXT,
-                            'required' => true,
-                            'main_params' => ['col' => 2]
-                        ],
-                        'label' => [
-                            'label' => 'Label',
-                            'type' => Option::TYPE_TEXT,
-                            'required' => true,
-                            'main_params' => ['col' => 2]
-                        ],
-                        'rules' => [
-                            'main_params' => ['style' => 'grid-template-columns: repeat(2, 1fr);display:grid'],
-                            'type' => Option::TYPE_GROUP,
-                            'method' => Option::METHOD_MULTIPLE,
-                            'template' => $this->parent::getRulesSettings()
-                        ]
-                    ],
-                    'label' => 'Rules'
-                ]
-            ),
-        ];
 
         add_filter(
-            'wp-lib-option/' . $this->getName() . '/expanded-option',
+            'wp-lib-option/' . self::getName() . '/expanded-option',
             function ($config) {
-                self::overwritePatterns($config['patterns'], $this->predefinedPatterns());
+                self::overwritePatterns($config['patterns'], $this->predefined());
                 self::overwritePatterns($config['patterns'], $this->getRegistered());
                 return $config;
             }
         );
+    }
 
-
-        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true]);
-
+    public function run(): void
+    {
         if (is_admin()) {
             $this->adminInit();
         }
     }
 
-    public function predefinedPatterns(): array
+    public function predefined(): array
     {
         $generated_patterns = [
-            // Is Backend
+            /*// Is Backend
             [
                 'name' => 'backend',
                 'label' => 'Backend',
@@ -150,10 +216,10 @@ class Patterns
                             'logic' => $this->parent::LOGIC_AND,
                         ],
                     ],
-            ]
+            ]*/
         ];
 
-        if (($this->parent->config['common']['include_wp_rewrite_rules_as_patterns'] ?? false)) {
+        if (($this->parent::getConfig()['common']['include_wp_rewrite_rules_as_patterns'] ?? false)) {
             $rewrite_rules = get_option('rewrite_rules', []);
             foreach ($rewrite_rules as $rule => $rewrite) {
                 $generated_patterns[] = [
@@ -179,7 +245,7 @@ class Patterns
             }
         }
 
-        return apply_filters($this->getName() . '-predefined', $generated_patterns);
+        return apply_filters(self::getName() . '-predefined', $generated_patterns);
     }
 
     /**
@@ -187,9 +253,9 @@ class Patterns
      */
     public function register(array $patterns): void
     {
-        $registered_patterns = Option::getOption('registered_patterns', $this->getName(), []);
+        $registered_patterns = Option::getOption('registered_patterns', self::getName(), []);
         self::overwritePatterns($registered_patterns, $patterns);
-        Option::setOption('registered_patterns', $this->getName(), $registered_patterns, true);
+        Option::setOption('registered_patterns', self::getName(), $registered_patterns, true);
     }
 
     /**
@@ -197,7 +263,7 @@ class Patterns
      */
     public function getRegistered(): array
     {
-        return Option::getOption('registered_patterns', $this->getName(), [], true);
+        return Option::getOption('registered_patterns', self::getName(), [], true);
     }
 
     /**
@@ -205,13 +271,13 @@ class Patterns
      */
     public function removeRegistered(string $name): void
     {
-        $registered_patterns = Option::getOption('registered_patterns', $this->getName(), []);
+        $registered_patterns = Option::getOption('registered_patterns', self::getName(), []);
 
         $index = Arrays::ufind($registered_patterns, 'name', $name);
 
         unset($registered_patterns[$index]);
 
-        Option::setOption('registered_patterns', $this->getName(), $registered_patterns, true);
+        Option::setOption('registered_patterns', self::getName(), $registered_patterns, true);
     }
 
     /**
@@ -262,7 +328,7 @@ class Patterns
     public function getPattern($name)
     {
         return Arrays::ufind(
-            $this->getPatterns(),
+            self::getPatterns(),
             $name,
             'name',
             null,
@@ -275,9 +341,9 @@ class Patterns
     /**
      * @return array
      */
-    public function getPatterns(): array
+    public static function getPatterns(): array
     {
-        return $this->config['patterns'] ?? [];
+        return self::getConfig()['patterns'] ?? [];
     }
 
     /**
@@ -286,7 +352,7 @@ class Patterns
     public function getPatternsMap(): array
     {
         $list = [];
-        foreach ($this->getPatterns() as $pattern) {
+        foreach (self::getPatterns() as $pattern) {
             if (isset($pattern['name'])) {
                 $list[$pattern['name']] = $pattern['label'] ?? $pattern['name'];
             }
@@ -296,19 +362,11 @@ class Patterns
     }
 
     /**
-     * @return array
-     */
-    public function getConfig(): array
-    {
-        return $this->config;
-    }
-
-    /**
      * @return string
      */
-    public function getName(): string
+    public static function getName(): string
     {
-        return $this->parent->getName() . '-patterns';
+        return Rules::getName() . '-patterns';
     }
 
     /**
@@ -336,11 +394,12 @@ class Patterns
     public function tabContent(): void
     {
         Option::printForm(
-            $this->getName(),
-            $this->settings,
+            self::getName(),
+            self::getSettings(),
             [
                 'wrap_params' => ['style' => 'width:100%;max-width:calc( 100% - 20px );'],
-                'serialize' => true
+                'serialize' => true,
+                'single_option' => true
             ]
         );
     }

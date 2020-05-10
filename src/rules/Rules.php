@@ -10,8 +10,14 @@ use diazoxide\helpers\URL;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
+use NovemBit\wp\plugins\spm\plugins\Plugins;
+use NovemBit\wp\plugins\spm\system\Component;
 
-class Rules
+/**
+ * @property Patterns $patterns
+ * @property Bootstrap $parent
+ * */
+class Rules extends Component
 {
 
     public const TYPE_REQUEST = 'request';
@@ -25,15 +31,14 @@ class Rules
     public const LOGIC_AND = 'and';
     public const LOGIC_OR = 'or';
     public const LOGIC_NOT = 'not';
-    /**
-     * @var Bootstrap
-     * */
-    public $parent;
 
-    /**
-     * @var $patterns
-     * */
-    public $patterns;
+
+    protected static function components(): array
+    {
+        return [
+            'patterns' => Patterns::class,
+        ];
+    }
 
     /**
      * @var array
@@ -43,60 +48,90 @@ class Rules
     /**
      * @var array
      * */
-    public $settings = [];
+    public static $settings;
 
     /**
      * @var array
      * */
-    public $config = [];
+    public static $config;
+
+    public static function getSettings():array{
+        if(!isset(self::$settings)){
+            self::$settings = [
+                'plugins' => [
+                    'rules' => new Option(
+                        [
+                            'default' => false,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Rules',
+                            'description' => 'Each plugin can have custom specific rules.'
+                        ]
+                    ),
+                    'patterns' => new Option(
+                        [
+                            'default' => true,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Patterns',
+                            'description' => 'Each plugin can have custom specific patterns.'
+                        ]
+                    )
+                ],
+                'patterns' => [
+                    'active' => new Option(
+                        [
+                            'default' => true,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Enable patterns',
+                            'description' => 'Enable patterns system.'
+                        ]
+                    ),
+                    'include_wp_rewrite_rules_as_patterns' => new Option(
+                        [
+                            'default' => false,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Include WordPress rewrite rules as patterns',
+                            'description' => HTML::tag(
+                                'div',
+                                [
+                                    ['span', 'Include WordPress rewrite rules as patterns.'],
+                                    ['h4', 'In plugins patterns field pattern names starting with RR']
+                                ]
+                            )
+                        ]
+                    ),
+                ]
+            ];
+        }
+        return self::$settings;
+    }
 
     /**
-     * Patterns constructor.
-     * @param Bootstrap $parent
+     * @return array
      */
-    public function __construct(Bootstrap $parent)
+    public static function getConfig():array{
+        if(!isset(self::$config)) {
+            self::$config = Option::expandOptions(
+                self::getSettings(),
+                self::getName(),
+                ['serialize' => true, 'single_option' => true]
+            );
+        }
+        return self::$config;
+    }
+    /**
+     * Patterns constructor.
+     */
+    public function init(): void
     {
-        $this->parent = $parent;
+    }
 
-        $this->settings = [
-            'common' => [
-                'include_wp_rewrite_rules_as_patterns' => new Option(
-                    [
-                        'default' => false,
-                        'type' => Option::TYPE_BOOL,
-                        'label' => 'Include WordPress rewrite rules as patterns',
-                        'description' => HTML::tag(
-                            'div',
-                            [
-                                ['h4', 'Include WordPress rewrite rules as patterns.'],
-                                ['h4', 'In plugins patterns field pattern names starting with RR']
-                            ]
-                        )
-                    ]
-                ),
-                'plugin_custom_rules' => new Option(
-                    [
-                        'default' => false,
-                        'type' => Option::TYPE_BOOL,
-                        'label' => 'Plugin Custom Rules',
-                        'description' => HTML::tag(
-                            'div',
-                            [
-                                ['h4', 'Each plugin can have custom specific rules.'],
-                            ]
-                        )
-                    ]
-                )
-            ],
-        ];
-
-        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true,]);
-
-        $this->patterns = new Patterns($this);
-
+    public function run(): void
+    {
         if (is_admin()) {
             $this->adminInit();
         }
+
+        $this->patterns->run();
     }
 
     /**
@@ -111,9 +146,9 @@ class Rules
     /**
      * @return string
      */
-    public function getName(): string
+    public static function getName(): string
     {
-        return $this->parent->getName() . '-rules';
+        return Bootstrap::getName() . '-rules';
     }
 
     /**
@@ -123,11 +158,11 @@ class Rules
     public function adminMenu(): void
     {
         add_submenu_page(
-            $this->parent->getName(),
+            Bootstrap::getName(),
             __('Rules', 'novembit-spm'),
             __('Rules', 'novembit-spm'),
             'manage_options',
-            $this->getName(),
+            self::getName(),
             [$this, 'adminContent']
         );
 
@@ -141,7 +176,7 @@ class Rules
     public function adminContent(): void
     {
         $tabs = [];
-        $current_url = admin_url('admin.php?page=' . $this->getName());
+        $current_url = admin_url('admin.php?page=' . self::getName());
         $active = Environment::get('sub-action') ?? 'default';
 
         $active_tab = $this->tabs[$active];
@@ -176,11 +211,12 @@ class Rules
     public function defaultTabContent(): void
     {
         Option::printForm(
-            $this->getName(),
-            $this->settings,
+            self::getName(),
+            self::getSettings(),
             [
                 'title' => 'Rules configuration',
-                'serialize' => true
+                'serialize' => true,
+                'single_option' => true
             ]
         );
     }
@@ -307,14 +343,13 @@ class Rules
                 } elseif ($type === self::TYPE_HOOK) {
                     $_value = apply_filters($key, $params);
                 } elseif ($type === self::TYPE_FUNCTION && function_exists($key)) {
-
                     $_value = $key(...self::extractAllVariables($params));
                 } else {
                     continue;
                 }
 
-                $_value = apply_filters($this->getName() . '-assertion-' . $type . '-value', $_value, $params);
-                $_value = apply_filters($this->getName() . '-assertion-value', $_value, $type, $key, $params);
+                $_value = apply_filters(self::getName() . '-assertion-' . $type . '-value', $_value, $params);
+                $_value = apply_filters(self::getName() . '-assertion-value', $_value, $type, $key, $params);
 
                 $assertion = Variables::compare($compare, $_value, $value);
             }

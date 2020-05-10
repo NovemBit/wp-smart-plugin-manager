@@ -3,15 +3,17 @@
 namespace NovemBit\wp\plugins\spm\integrations;
 
 use diazoxide\wp\lib\option\v2\Option;
+use Exception;
 use NovemBit\wp\plugins\spm\Bootstrap;
 use NovemBit\wp\plugins\spm\integrations\brandlight\Brandlight;
 use NovemBit\wp\plugins\spm\integrations\novembit\I18n;
+use NovemBit\wp\plugins\spm\system\Component;
 
 /**
  * @property I18n $i18n
  * @property Brandlight $brandlight
  * */
-class Integrations
+class Integrations extends Component
 {
 
     /**
@@ -25,7 +27,7 @@ class Integrations
     public $i18n;
 
     private $integrations = [
-        'brandlight'=>Brandlight::class,
+        'brandlight' => Brandlight::class,
         'i18n' => I18n::class,
     ];
 
@@ -39,9 +41,8 @@ class Integrations
      * */
     private $config;
 
-    public function __construct(Bootstrap $parent)
+    protected function init():void
     {
-        $this->parent = $parent;
 
         foreach ($this->integrations as $key => $class) {
             $this->settings['integrations'][$key] =
@@ -49,15 +50,18 @@ class Integrations
                     [
                         'type' => Option::TYPE_BOOL,
                         'label' => $class::NAME,
-                        'description'=> 'Enable/Disable integration'
+                        'description' => 'Enable/Disable integration'
                     ]
                 );
         }
 
-        $this->config = Option::expandOptions($this->settings, $this->getName(), ['serialize' => true]);
+        $this->config = Option::expandOptions(
+            $this->settings,
+            $this->getName(),
+            ['serialize' => true, 'single_option' => true]
+        );
 
         foreach ($this->config['integrations'] as $integration => $status) {
-
             if ($status === true) {
                 $class = $this->integrations[$integration] ?? null;
                 if ($class !== null) {
@@ -65,7 +69,9 @@ class Integrations
                 }
             }
         }
+    }
 
+    public function run(){
         if (is_admin()) {
             $this->adminInit();
         }
@@ -87,7 +93,7 @@ class Integrations
     public function adminMenu(): void
     {
         add_submenu_page(
-            $this->parent->getName(),
+            $this->parent::getName(),
             __('Integrations', 'novembit-spm'),
             __('Integrations', 'novembit-spm'),
             'manage_options',
@@ -99,6 +105,7 @@ class Integrations
     /**
      * Admin Content
      * @return void
+     * @throws Exception
      */
     public function adminContent(): void
     {
@@ -109,7 +116,8 @@ class Integrations
                 'title' => 'Smart Plugin Manager - Integrations',
                 'ajax_submit' => true,
                 'auto_submit' => true,
-                'serialize' => true
+                'serialize' => true,
+                'single_option' => true
             ]
         );
     }
@@ -119,7 +127,7 @@ class Integrations
      */
     public function getName(): string
     {
-        return $this->parent->getName() . '-integrations';
+        return $this->parent::getName() . '-integrations';
     }
 
 }

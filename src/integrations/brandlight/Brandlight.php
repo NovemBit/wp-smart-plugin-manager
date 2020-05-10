@@ -90,7 +90,7 @@ class Brandlight
                     ],
             ],
             [
-                'label' => 'BL: ajax/woocommerce_get_refreshed_fragments',
+                'label' => 'BL: ajax/woocommerce_get_refrehed_fragments',
                 'name' => 'bl_ajax/woocommerce_get_refreshed_fragments',
                 'rules' =>
                     [

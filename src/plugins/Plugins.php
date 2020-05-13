@@ -10,15 +10,14 @@ use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use Exception;
 use NovemBit\wp\plugins\spm\Bootstrap;
-use NovemBit\wp\plugins\spm\rules\Patterns;
+use NovemBit\wp\plugins\spm\rules\Filters;
 use NovemBit\wp\plugins\spm\rules\Rules;
-use NovemBit\wp\plugins\spm\system\Component;
 
 /**
  * @property Bootstrap $parent
  *
  * */
-class Plugins extends Component
+class Plugins
 {
 
     /**
@@ -38,6 +37,7 @@ class Plugins extends Component
 
     private $active_plugins = [];
 
+    private $verbose = [];
 
     /**
      * Actions
@@ -52,11 +52,15 @@ class Plugins extends Component
         return Bootstrap::getName() . '-plugins';
     }
 
+    /**
+     * @return array
+     */
     public static function getSettings(): array
     {
         if (!isset(self::$settings)) {
             self::$settings = [];
-            $plugins = Bootstrap::instance()->getAllPlugins();
+
+            $plugins = Bootstrap::getAllPlugins();
 
             foreach ($plugins as $file => $plugin_data) {
                 add_filter(
@@ -77,19 +81,24 @@ class Plugins extends Component
                 unset($plugins_list[$file]);
                 self::$settings[$file] = [
                     'name' => $plugin_data['Name'] ?? $file,
-                    'patterns' => Bootstrap::instance()->isEnabledPatterns() ? new Option(
+                    'filters' => new Option(
                         [
-                            'label' => 'Patterns',
+                            'label' => 'Filters',
                             'method' => Option::METHOD_MULTIPLE,
                             'relation' => [
-                                'parent' => Patterns::getName(),
-                                'with' => [Patterns::class, 'getSettings'],
-                                'name' => 'patterns',
+                                'parent' => Filters::getName(),
+                                'with' => [Filters::class, 'getSettings'],
+                                'name' => 'filters',
                                 'key' => 'name',
                                 'label' => 'label',
                             ],
                             'before_set_value' => static function (Option $option, &$value) use ($file) {
-                                $map = Option::getOption('_asd_relation_map', '_asd', [], true);
+                                $map = Option::getOption(
+                                    self::filtersRelationMapName(),
+                                    Bootstrap::getName(),
+                                    [],
+                                    true
+                                );
                                 foreach ($value as $item) {
                                     $row = [$file, $item];
                                     if (!in_array($row, $map, true)) {
@@ -101,11 +110,16 @@ class Plugins extends Component
                                         unset($map[$key]);
                                     }
                                 }
-                                Option::setOption('_asd_relation_map', '_asd', $map, true);
+                                Option::setOption(self::filtersRelationMapName(), Bootstrap::getName(), $map, true);
                                 return false;
                             },
                             'before_get_value' => static function (Option $option, &$value) use ($file) {
-                                $map = Option::getOption('_asd_relation_map', '_asd', [], true);
+                                $map = Option::getOption(
+                                    self::filtersRelationMapName(),
+                                    Bootstrap::getName(),
+                                    [],
+                                    true
+                                );
                                 $value = [];
                                 foreach ($map as $item) {
                                     if ($item[0] === $file) {
@@ -115,18 +129,18 @@ class Plugins extends Component
                             },
                             'main_params' => ['col' => 1],
                         ]
-                    ) : [],
-                    'rules' => Bootstrap::instance()->isEnabledCustomRules() ? new Option(
+                    ),
+                    'rules' => new Option(
                         [
                             'default' => [],
                             'method' => Option::METHOD_MULTIPLE,
                             'type' => Option::TYPE_GROUP,
                             'values' => [],
-                            'main_params' => ['col' => '1'],
+                            'main_params' => ['col' => 1],
                             'template' => Rules::getRulesSettings(),
                             'label' => 'Rules'
                         ]
-                    ) : [],
+                    ),
                 ];
             }
 
@@ -137,7 +151,7 @@ class Plugins extends Component
             uksort(
                 self::$settings,
                 static function ($a, $b) {
-                    if (Bootstrap::instance()->isPluginActive($a)) {
+                    if (Bootstrap::isPluginActive($a)) {
                         return 0;
                     }
                     return 1;
@@ -162,22 +176,16 @@ class Plugins extends Component
 
     /**
      * Plugins constructor.
-     * @uses setBeforeNestedFields
+     * @param Bootstrap $parent
      * @uses handleRequestActions
      * @uses setNestedFieldName
+     * @uses setBeforeNestedFields
      */
-    public function init(): void
+    public function __construct(Bootstrap $parent)
     {
+        $this->parent = $parent;
         add_action('init', [$this, 'handleRequestActions']);
-
         $this->initActivePlugins();
-    }
-
-    /**
-     * @return void
-     */
-    public function run(): void
-    {
         /**
          * @uses adminBarMenu
          * */
@@ -187,6 +195,7 @@ class Plugins extends Component
             $this->adminInit();
         }
     }
+
 
     /**
      * @param $admin_bar
@@ -214,7 +223,7 @@ class Plugins extends Component
      */
     private function isPluginActive(string $plugin): bool
     {
-        return $this->parent->getAllPlugins()[$plugin]['custom_data']['is_active'] ?? false;
+        return Bootstrap::getAllPlugins()[$plugin]['custom_data']['is_active'] ?? false;
     }
 
     /**
@@ -247,7 +256,7 @@ class Plugins extends Component
 
         $this->active_plugins = $this->orig_active_plugins;
 
-        unset($this->active_plugins[array_search($this->parent::getSelfPlugin(), $this->active_plugins)]);
+        unset($this->active_plugins[array_search($this->parent::getSelfPlugin(), $this->active_plugins, true)]);
 
         if (Variables::compare(
             Variables::COMPARE_STARTS_WITH,
@@ -272,26 +281,34 @@ class Plugins extends Component
             return;
         }
 
+
         $config = self::getConfig();
 
         foreach ($config as $plugin => $data) {
-            if (!Bootstrap::instance()->isPluginActive($plugin)) {
+            if (!Bootstrap::isPluginActive($plugin)) {
                 continue;
             }
 
             $rules = array_values($data['rules'] ?? []);
-            $patterns = array_values($data['patterns'] ?? []);
+            $filters = array_values($data['filters'] ?? []);
 
-            if (($this->checkPatterns($patterns) || $this->checkRules($rules))) {
+            if (
+                $this->checkFilters($filters, $this->verbose[$plugin]['filters'])
+                || $this->checkRules($rules, $this->verbose[$plugin]['rules'])
+            ) {
                 unset($this->active_plugins[array_search($plugin, $this->active_plugins, true)]);
             }
         }
+
+        echo '<!-- DEBUG' . PHP_EOL;
+        var_dump($this->verbose);
+        echo 'DEBUG -->';
 
         if (
             ($this->parent::getConfig()['debug']['active'] ?? false) &&
             ($this->parent::getConfig()['debug']['plugins_on_admin_bar'] ?? false)
         ) {
-            foreach ($this->parent->getAllPlugins() as $plugin => $params) {
+            foreach (Bootstrap::getAllPlugins() as $plugin => $params) {
                 $status = Environment::get(self::getPluginHash($plugin));
                 if (($status === '0') && in_array($plugin, $this->active_plugins, true)) {
                     unset($this->active_plugins[array_search($plugin, $this->active_plugins, true)]);
@@ -303,7 +320,7 @@ class Plugins extends Component
             /**
              * @uses adminToolbar
              * */
-            add_action('wp_before_admin_bar_render',[$this, 'adminBarPlugins']);
+            add_action('wp_before_admin_bar_render', [$this, 'adminBarPlugins']);
         }
 
         if ($this->parent->authorizedDebug()) {
@@ -318,23 +335,29 @@ class Plugins extends Component
         add_filter('option_active_plugins', [$this, 'overwriteActivePlugins'], PHP_INT_MAX, 0);
     }
 
+    public static function filtersRelationMapName(): string
+    {
+        return 'plugins-filters-relation';
+    }
+
     /**
-     * @param $patterns
+     * @param array $filters
+     * @param array|null $verbose
      * @return bool
      */
-    private function checkPatterns(array $patterns): bool
+    private function checkFilters(array $filters, ?array &$verbose = null): bool
     {
-        return Bootstrap::instance()->isEnabledPatterns() &&
-            $this->parent->rules->patterns->checkPatterns($patterns);
+        return $this->parent->rules->filters->checkFilters($filters, $verbose);
     }
 
     /**
      * @param array $rules
+     * @param array|null $verbose
      * @return bool
      */
-    private function checkRules(array $rules): bool
+    private function checkRules(array $rules, ?array &$verbose = null): bool
     {
-        return Bootstrap::instance()->isEnabledCustomRules() && $this->parent->rules->checkRules($rules);
+        return $this->parent->rules->checkRules($rules, $verbose);
     }
 
     /**
@@ -349,17 +372,17 @@ class Plugins extends Component
     public function adminBarPlugins(): void
     {
         global $wp_admin_bar;
-        foreach ($this->parent->getAllPlugins() as $plugin => $data) {
+        foreach (Bootstrap::getAllPlugins() as $plugin => $data) {
             $active = in_array($plugin, $this->active_plugins, true);
-            $title = $this->parent->getAllPlugins()[$plugin]['Name'] ?? $plugin;
+            $title = Bootstrap::getAllPlugins()[$plugin]['Name'] ?? $plugin;
 
-            $url_key = self::getPluginHash($plugin);
-            $url = URL::removeQueryVars(URL::getCurrent(), $url_key);
-            $url = URL::addQueryVars($url, $url_key, $active ? '0' : '1');
+            $hash = self::getPluginHash($plugin);
+            $url = URL::removeQueryVars(URL::getCurrent(), $hash);
+            $url = URL::addQueryVars($url, $hash, $active ? '0' : '1');
 
             $wp_admin_bar->add_node(
                 [
-                    'id' => self::getName() . '-' . $plugin,
+                    'id' => self::getName() . '-' . $hash,
                     'parent' => self::getName(),
                     'title' => HTML::tag(
                         'span',
@@ -371,6 +394,34 @@ class Plugins extends Component
                     'href' => $url
                 ]
             );
+
+
+            if (!$active) {
+                foreach ($this->verbose[$plugin] as $type => $verbose) {
+//                    if ($type === 'rules') {
+//                        continue;
+//                    }
+                    $wp_admin_bar->add_node(
+                        [
+                            'id' => self::getName() . '-' . $hash . '-' . $type,
+                            'parent' => self::getName() . '-' . $hash,
+                            'title' => HTML::tag('span',ucfirst($type),['style'=>'color:orange']),
+                            'href' => '#'
+                        ]
+                    );
+
+                    foreach ($this->verbose[$plugin][$type] ?? [] as $filter_name => $filter_verbose) {
+                        $wp_admin_bar->add_node(
+                            [
+                                'id' => self::getName() . '-' . $hash . '-' . $type . '-' . $filter_name,
+                                'parent' => self::getName() . '-' . $hash,
+                                'title' => $filter_name,
+                                'href' => '#'
+                            ]
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -409,7 +460,7 @@ class Plugins extends Component
     {
         $html = '';
         foreach ($plugins as $plugin) {
-            $plugin = $this->parent->getAllPlugins()[$plugin]['Name'] ?? $plugin;
+            $plugin = Bootstrap::getAllPlugins()[$plugin]['Name'] ?? $plugin;
             $html .= HTML::tag('p', $plugin);
         }
         return $html;
@@ -431,7 +482,7 @@ class Plugins extends Component
 
             $plugin = base64_decode($plugin);
 
-            $is_active = Bootstrap::instance()->isPluginActive($plugin);
+            $is_active = Bootstrap::isPluginActive($plugin);
 
             /**
              * @uses resetActivePlugins
@@ -451,9 +502,9 @@ class Plugins extends Component
     public static function setNestedFieldName($label): string
     {
         $plugin = $label;
-        $label = Bootstrap::instance()->getAllPlugins()[$plugin]['Name'] ?? $label;
+        $label = Bootstrap::getAllPlugins()[$plugin]['Name'] ?? $label;
         $label .= ' (';
-        $label .= Bootstrap::instance()->getAllPlugins()[$plugin]['Version'] ?? '?';
+        $label .= Bootstrap::getAllPlugins()[$plugin]['Version'] ?? '?';
         $label .= ') ';
         $label .= self::getPluginActiveStatusBadge($plugin, false);
         return $label;
@@ -467,7 +518,7 @@ class Plugins extends Component
     public static function setBeforeNestedFields($content, $route): string
     {
         $html = '';
-        $plugin_data = Bootstrap::instance()->getAllPlugins()[$route] ?? null;
+        $plugin_data = Bootstrap::getAllPlugins()[$route] ?? null;
         if ($plugin_data) {
             $html .= self::getPluginActions($route);
             $html .= self::getPluginInfo($plugin_data);
@@ -487,7 +538,7 @@ class Plugins extends Component
 
         $current_url = add_query_arg($wp->query_vars, admin_url($wp->request));
         $current_url = add_query_arg(['plugin' => base64_encode($plugin)], $current_url);
-        $is_active = Bootstrap::instance()->isPluginActive($plugin);
+        $is_active = Bootstrap::isPluginActive($plugin);
         $label = __($is_active ? 'Deactivate' : 'Activate', 'novembit-spm');
         $activate_url = wp_nonce_url($current_url, self::ACTION_PLUGIN_ACTIVATE, self::getName());
 
@@ -511,7 +562,7 @@ class Plugins extends Component
     private static function getPluginActiveStatusBadge(string $plugin, bool $with_label = true): string
     {
         $class = 'plugin-active-status-badge';
-        if (Bootstrap::instance()->isPluginActive($plugin)) {
+        if (Bootstrap::isPluginActive($plugin)) {
             $label = __('Activated', 'wordpress');
             $class .= ' activated';
         } else {
@@ -549,7 +600,7 @@ class Plugins extends Component
      */
     public function adminInit(): void
     {
-        add_action('admin_menu', [$this, 'adminMenu']);
+        add_action('admin_menu', [$this, 'adminMenu'], 11);
     }
 
     /**
@@ -569,18 +620,18 @@ class Plugins extends Component
     }
 
     /**
-     * Assign pattern to plugin
+     * Assign filter to plugin
      *
      * @param string $plugin
-     * @param array $patterns
+     * @param array $filters
      */
-    public function assignPatterns(string $plugin, array $patterns): void
+    public function assignFilters(string $plugin, array $filters): void
     {
-        $option_name = $plugin . '>patterns';
+        $option_name = $plugin . '>filters';
         $option = Option::getOption($option_name, self::getName(), []);
 
-        if (!empty($patterns)) {
-            array_push($option, ...$patterns);
+        if (!empty($filters)) {
+            array_push($option, ...$filters);
         }
 
         $option = array_unique($option);

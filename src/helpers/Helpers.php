@@ -4,9 +4,8 @@ namespace NovemBit\wp\plugins\spm\helpers;
 
 use diazoxide\helpers\Environment;
 use NovemBit\wp\plugins\spm\Bootstrap;
-use NovemBit\wp\plugins\spm\system\Component;
 
-class Helpers extends Component
+class Helpers
 {
     /**
      * @var Bootstrap
@@ -48,8 +47,9 @@ class Helpers extends Component
         return Environment::server('REQUEST_URI');
     }
 
-    protected function init(): void
+    public function __construct(Bootstrap $parent)
     {
+        $this->parent = $parent;
         // TODO: Implement init() method.
     }
 }

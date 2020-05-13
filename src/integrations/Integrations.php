@@ -13,7 +13,7 @@ use NovemBit\wp\plugins\spm\system\Component;
  * @property I18n $i18n
  * @property Brandlight $brandlight
  * */
-class Integrations extends Component
+class Integrations
 {
 
     /**
@@ -41,8 +41,9 @@ class Integrations extends Component
      * */
     private $config;
 
-    protected function init():void
+    public function __construct(Bootstrap $parent)
     {
+        $this->parent = $parent;
 
         foreach ($this->integrations as $key => $class) {
             $this->settings['integrations'][$key] =
@@ -69,9 +70,7 @@ class Integrations extends Component
                 }
             }
         }
-    }
 
-    public function run(){
         if (is_admin()) {
             $this->adminInit();
         }
@@ -83,7 +82,7 @@ class Integrations extends Component
      */
     public function adminInit(): void
     {
-        add_action('admin_menu', [$this, 'adminMenu']);
+        add_action('admin_menu', [$this, 'adminMenu'],11);
     }
 
     /**

@@ -449,9 +449,9 @@ class Brandlight
         $this->parent = $parent;
 
         add_filter(
-            'smart-plugin-manager-rules-patterns-predefined',
+            Patterns::getName() . '-predefined',
             function ($patterns) {
-                Patterns::overwritePatterns(
+                Patterns::overwriteRegistered(
                     $patterns,
                     $this->getPatterns()
                 );

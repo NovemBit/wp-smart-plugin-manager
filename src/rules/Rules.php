@@ -10,15 +10,21 @@ use diazoxide\helpers\URL;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
 use NovemBit\wp\plugins\spm\Bootstrap;
-use NovemBit\wp\plugins\spm\plugins\Plugins;
-use NovemBit\wp\plugins\spm\system\Component;
 
 /**
- * @property Patterns $patterns
  * @property Bootstrap $parent
  * */
-class Rules extends Component
+class Rules
 {
+    /**
+     * @var Filters
+     * */
+    public $filters;
+
+    /**
+     * @var Patterns
+     * */
+    public $patterns;
 
     public const TYPE_REQUEST = 'request';
     public const TYPE_GET = 'get';
@@ -37,6 +43,7 @@ class Rules extends Component
     {
         return [
             'patterns' => Patterns::class,
+            'filters' => Filters::class,
         ];
     }
 
@@ -55,8 +62,12 @@ class Rules extends Component
      * */
     public static $config;
 
-    public static function getSettings():array{
-        if(!isset(self::$settings)){
+    /**
+     * @return array|Option[]
+     */
+    public static function getSettings(): array
+    {
+        if (!isset(self::$settings)) {
             self::$settings = [
                 'plugins' => [
                     'rules' => new Option(
@@ -67,12 +78,22 @@ class Rules extends Component
                             'description' => 'Each plugin can have custom specific rules.'
                         ]
                     ),
-                    'patterns' => new Option(
+                    'filters' => new Option(
                         [
                             'default' => true,
                             'type' => Option::TYPE_BOOL,
-                            'label' => 'Patterns',
-                            'description' => 'Each plugin can have custom specific patterns.'
+                            'label' => 'Filters',
+                            'description' => 'Each plugin can have custom specific filters.'
+                        ]
+                    )
+                ],
+                'filters' => [
+                    'active' => new Option(
+                        [
+                            'default' => true,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Enable filters',
+                            'description' => 'Enable filters system.'
                         ]
                     )
                 ],
@@ -81,8 +102,8 @@ class Rules extends Component
                         [
                             'default' => true,
                             'type' => Option::TYPE_BOOL,
-                            'label' => 'Enable patterns',
-                            'description' => 'Enable patterns system.'
+                            'label' => 'Enable filters',
+                            'description' => 'Enable filters system.'
                         ]
                     ),
                     'include_wp_rewrite_rules_as_patterns' => new Option(
@@ -94,7 +115,7 @@ class Rules extends Component
                                 'div',
                                 [
                                     ['span', 'Include WordPress rewrite rules as patterns.'],
-                                    ['h4', 'In plugins patterns field pattern names starting with RR']
+                                    ['h4', 'In plugins filters field filter names starting with RR']
                                 ]
                             )
                         ]
@@ -108,8 +129,9 @@ class Rules extends Component
     /**
      * @return array
      */
-    public static function getConfig():array{
-        if(!isset(self::$config)) {
+    public static function getConfig(): array
+    {
+        if (!isset(self::$config)) {
             self::$config = Option::expandOptions(
                 self::getSettings(),
                 self::getName(),
@@ -118,20 +140,21 @@ class Rules extends Component
         }
         return self::$config;
     }
-    /**
-     * Patterns constructor.
-     */
-    public function init(): void
-    {
-    }
 
-    public function run(): void
+    /**
+     * Filters constructor.
+     * @param Bootstrap $parent
+     */
+    public function __construct(Bootstrap $parent)
     {
+        $this->parent = $parent;
+
+        $this->patterns = new Patterns($this);
+        $this->filters = new Filters($this);
+
         if (is_admin()) {
             $this->adminInit();
         }
-
-        $this->patterns->run();
     }
 
     /**
@@ -140,7 +163,7 @@ class Rules extends Component
      */
     public function adminInit(): void
     {
-        add_action('admin_menu', [$this, 'adminMenu']);
+        add_action('admin_menu', [$this, 'adminMenu'], 11);
     }
 
     /**
@@ -257,7 +280,7 @@ class Rules extends Component
             'type' => Option::TYPE_GROUP,
             'method' => Option::METHOD_MULTIPLE,
             'label' => 'Single Rule',
-            'main_params' => ['col' => '3'],
+            'main_params' => ['col' => 2],
             'template' => [
                 'type' => [
                     'type' => Option::TYPE_TEXT,
@@ -296,10 +319,11 @@ class Rules extends Component
                 ],
                 'value' => [
                     'type' => Option::TYPE_TEXT,
-                    'label' => 'Value (accepting magic params)'
+                    'label' => 'Value ( magic params )'
                 ],
                 'params' => [
-                    'label' => 'Additional params ( accepting magic params )',
+                    'label' => 'Additional params',
+                    'description' => 'Accepting magic params',
                     'method' => Option::METHOD_MULTIPLE,
                     'type' => Option::TYPE_TEXT
                 ],
@@ -309,16 +333,17 @@ class Rules extends Component
     }
 
     /**
-     * Check rule with custom described pattern
+     * Check rule with custom described filter
      * Included Login types
      *      `LOGIC_AND`
      *      `LOGIC_OR`
      *      `LOGIC_NOT`
      *
      * @param array $rules
+     * @param array|null $verbose
      * @return bool
      */
-    public function checkRules(array $rules): bool
+    public function checkRules(array $rules, ?array &$verbose = null): bool
     {
         $status = null;
 
@@ -363,6 +388,10 @@ class Rules extends Component
             if ($logic === 'not') {
                 $status = ($status ?? true) && !$assertion;
             }
+        }
+
+        if ($status === true) {
+            $verbose[] = $rules;
         }
 
         return $status ?? false;

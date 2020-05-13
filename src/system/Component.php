@@ -44,6 +44,19 @@ abstract class Component
         return $this->{$name};
     }
 
+    /**
+     * Prevent cloning of the instance of the Singleton instance.
+     *
+     * @return void
+     */
+    protected function __clone() {}
+
+    /**
+     * Prevent unserializing of the Singleton instance.
+     *
+     * @return void
+     */
+    protected function __wakeup() {}
 
     abstract protected function init(): void;
 }

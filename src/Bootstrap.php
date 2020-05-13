@@ -14,28 +14,31 @@ use NovemBit\wp\plugins\spm\system\Component;
 use RuntimeException;
 use WP_Admin_Bar;
 
-/**
- * @property Plugins $plugins
- * @property Integrations $integrations
- * @property Helpers $helpers
- * @property Rules $rules
- * */
-class Bootstrap extends Component
+class Bootstrap
 {
-
     public const SLUG = 'smart-plugin-manager';
 
     /**
-     * Statuses
+     * @var Plugins
      * */
-    public const STATUS_ENABLE_WHEN = 'enable_when';
-    public const STATUS_DISABLE_WHEN = 'disable_when';
-    public const STATUS_SMART = 'smart';
+    public $plugins;
+    /**
+     * @var Integrations
+     * */
+    public $integrations;
+    /**
+     * @var Helpers
+     * */
+    public $helpers;
+    /**
+     * @var Rules
+     * */
+    public $rules;
 
     /**
      * @var self
      * */
-    private static $instance;
+    public static $instance;
 
     /**
      * @var string
@@ -52,11 +55,10 @@ class Bootstrap extends Component
      * */
     private static $config;
 
-
     /**
      * @var array
      * */
-    private $all_plugins = [];
+    private static $all_plugins;
 
     /**
      * @return array|string[]
@@ -78,8 +80,7 @@ class Bootstrap extends Component
     public static function instance(?string $plugin_file = null): self
     {
         if (!isset(self::$instance)) {
-            self::$instance = new self();
-            self::$instance->plugin_file = $plugin_file;
+            self::$instance = new self($plugin_file);
         }
 
         return self::$instance;
@@ -88,9 +89,20 @@ class Bootstrap extends Component
     /**
      * @return array
      */
-    public function getAllPlugins(): array
+    public static function getAllPlugins(): array
     {
-        return $this->all_plugins;
+        if (!isset(self::$all_plugins)) {
+            include_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+            self::$all_plugins = get_plugins();
+
+            unset(self::$all_plugins[self::getSelfPlugin()]);
+
+            foreach (self::$all_plugins as $plugin => &$data) {
+                $data['custom_data']['is_active'] = is_plugin_active($plugin);
+            }
+        }
+        return self::$all_plugins;
     }
 
     /**
@@ -100,35 +112,19 @@ class Bootstrap extends Component
     {
         $result = [];
 
-        foreach ($this->getAllPlugins() as $file => $data) {
+        foreach (self::getAllPlugins() as $file => $data) {
             $result[$file] = $data['Name'] ?? $file;
         }
         return $result;
     }
 
-    /**
-     * Set All plugins
-     * @return void
-     */
-    public function setAllPlugins(): void
-    {
-        include_once ABSPATH . 'wp-admin/includes/plugin.php';
-
-        $this->all_plugins = get_plugins();
-
-        unset($this->all_plugins[self::getSelfPlugin()]);
-
-        foreach ($this->all_plugins as $plugin => &$data) {
-            $data['custom_data']['is_active'] = is_plugin_active($plugin);
-        }
-    }
 
     /**
      * @return bool
      */
-    public function isEnabledPatterns(): bool
+    public function isEnabledFilters(): bool
     {
-        return ($this->rules::getConfig()['plugins']['patterns'] ?? false);
+        return ($this->rules::getConfig()['plugins']['filters'] ?? false);
     }
 
     /**
@@ -145,9 +141,9 @@ class Bootstrap extends Component
      * @param string $plugin
      * @return bool
      */
-    public function isPluginActive(string $plugin): bool
+    public static function isPluginActive(string $plugin): bool
     {
-        return $this->getAllPlugins()[$plugin]['custom_data']['is_active'] ?? false;
+        return self::getAllPlugins()[$plugin]['custom_data']['is_active'] ?? false;
     }
 
     /**
@@ -204,9 +200,10 @@ class Bootstrap extends Component
         );
     }
 
-    public static function getSettings():array{
-        if(!isset(self::$settings)){
-            self::$settings =  [
+    public static function getSettings(): array
+    {
+        if (!isset(self::$settings)) {
+            self::$settings = [
                 'emergency' => [
                     'active' => new Option(
                         [
@@ -258,8 +255,9 @@ class Bootstrap extends Component
         return self::$settings;
     }
 
-    public static function getConfig():array{
-        if(!isset(self::$config)){
+    public static function getConfig(): array
+    {
+        if (!isset(self::$config)) {
             self::$config = Option::expandOptions(
                 self::getSettings(),
                 self::getName(),
@@ -272,10 +270,15 @@ class Bootstrap extends Component
 
     /**
      * Bootstrap constructor.
+     * @param $plugin_file
      */
-    protected function init(): void
+    public function __construct($plugin_file)
     {
-        $this->setAllPlugins();
+        $this->plugin_file = $plugin_file;
+        $this->helpers = new Helpers($this);
+        $this->integrations = new Integrations($this);
+        $this->rules = new Rules($this);
+        $this->plugins = new Plugins($this);
 
         if (is_admin()) {
             $this->adminInit();
@@ -338,6 +341,7 @@ class Bootstrap extends Component
         register_deactivation_hook($this->getPluginFile(), [$this, 'uninstall']);
 
         add_action('admin_menu', [$this, 'adminMenu']);
+
         add_action('admin_enqueue_scripts', array($this, 'enqueueAdminAssets'));
     }
 
@@ -353,10 +357,6 @@ class Bootstrap extends Component
         add_action('admin_bar_menu', [$this, 'adminBarMenu'], 100);
         add_action('wp_enqueue_scripts', array($this, 'enqueueCommonAssets'));
         add_action('admin_enqueue_scripts', array($this, 'enqueueCommonAssets'));
-
-        $this->integrations->run();
-        $this->rules->run();
-        $this->plugins->run();
     }
 
     /**
@@ -379,7 +379,7 @@ class Bootstrap extends Component
      * Admin Content
      * @throws \Exception
      */
-    public function adminContent(): void
+    public static function adminContent(): void
     {
         Option::printForm(
             self::getName(),

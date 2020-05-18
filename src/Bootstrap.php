@@ -10,7 +10,6 @@ use NovemBit\wp\plugins\spm\helpers\Helpers;
 use NovemBit\wp\plugins\spm\integrations\Integrations;
 use NovemBit\wp\plugins\spm\plugins\Plugins;
 use NovemBit\wp\plugins\spm\rules\Rules;
-use NovemBit\wp\plugins\spm\system\Component;
 use RuntimeException;
 use WP_Admin_Bar;
 
@@ -99,8 +98,14 @@ class Bootstrap
             unset(self::$all_plugins[self::getSelfPlugin()]);
 
             foreach (self::$all_plugins as $plugin => &$data) {
-                $data['custom_data']['is_active'] = is_plugin_active($plugin);
+                $is_activated = is_plugin_active($plugin);
+                if (!$is_activated && !self::coreDeactivatedPlugins()) {
+                    unset(self::$all_plugins[$plugin]);
+                    continue;
+                }
+                $data['custom_data']['is_active'] = $is_activated;
             }
+            unset($data);
         }
         return self::$all_plugins;
     }
@@ -116,23 +121,6 @@ class Bootstrap
             $result[$file] = $data['Name'] ?? $file;
         }
         return $result;
-    }
-
-
-    /**
-     * @return bool
-     */
-    public function isEnabledFilters(): bool
-    {
-        return ($this->rules::getConfig()['plugins']['filters'] ?? false);
-    }
-
-    /**
-     * @return bool
-     */
-    public function isEnabledCustomRules(): bool
-    {
-        return $this->rules::getConfig()['plugins']['rules'] ?? false;
     }
 
     /**
@@ -200,10 +188,61 @@ class Bootstrap
         );
     }
 
+    public static function coreDeactivatedPlugins(): bool
+    {
+        return self::getConfig()['common']['core_deactivated_plugins'] ?? false;
+    }
+
     public static function getSettings(): array
     {
         if (!isset(self::$settings)) {
             self::$settings = [
+                'common' => [
+                    'core_deactivated_plugins' => new Option(
+                        [
+                            'main_params' => ['style' => 'grid-template-columns: repeat(2, 1fr);display:grid'],
+                            'default' => false,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Control WordPress deactivated plugins.'
+                        ]
+                    ),
+                ],
+                'plugins' => [
+                    'rules' => new Option(
+                        [
+                            'default' => false,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Rules',
+                            'description' => 'Each plugin can have custom specific rules.'
+                        ]
+                    ),
+                    'filters' => new Option(
+                        [
+                            'default' => true,
+                            'type' => Option::TYPE_BOOL,
+                            'label' => 'Filters',
+                            'description' => 'Each plugin can have custom specific filters.'
+                        ]
+                    )
+                ],
+                'rules' => [
+                    'patterns' => [
+                        'wp_rewrite_rules' => new Option(
+                            [
+                                'default' => false,
+                                'type' => Option::TYPE_BOOL,
+                                'label' => 'Include WordPress rewrite rules as patterns',
+                                'description' => HTML::tag(
+                                    'div',
+                                    [
+                                        ['span', 'Include WordPress rewrite rules as patterns.'],
+                                        ['h4', 'In plugins filters field filter names starting with RR']
+                                    ]
+                                )
+                            ]
+                        ),
+                    ]
+                ],
                 'emergency' => [
                     'active' => new Option(
                         [
@@ -255,6 +294,16 @@ class Bootstrap
         return self::$settings;
     }
 
+    public static function isActivePluginFilters(): bool
+    {
+        return self::getConfig()['plugins']['filters'] ? true : false;
+    }
+
+    public static function isActivePluginRules(): bool
+    {
+        return self::getConfig()['plugins']['rules'] ? true : false;
+    }
+
     public static function getConfig(): array
     {
         if (!isset(self::$config)) {
@@ -275,6 +324,7 @@ class Bootstrap
     public function __construct($plugin_file)
     {
         $this->plugin_file = $plugin_file;
+
         $this->helpers = new Helpers($this);
         $this->integrations = new Integrations($this);
         $this->rules = new Rules($this);

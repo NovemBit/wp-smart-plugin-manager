@@ -7,7 +7,6 @@ use Exception;
 use NovemBit\wp\plugins\spm\Bootstrap;
 use NovemBit\wp\plugins\spm\integrations\brandlight\Brandlight;
 use NovemBit\wp\plugins\spm\integrations\novembit\I18n;
-use NovemBit\wp\plugins\spm\system\Component;
 
 /**
  * @property I18n $i18n
@@ -26,45 +25,66 @@ class Integrations
      * */
     public $i18n;
 
-    private $integrations = [
+    /**
+     * @var string[]
+     */
+    private static $integrations = [
         'brandlight' => Brandlight::class,
         'i18n' => I18n::class,
     ];
 
-    /**
-     * @var array
-     * */
-    private $settings;
 
     /**
      * @var array
      * */
-    private $config;
+    private static $config;
+
+    /**
+     * @var
+     */
+    private static $settings;
+
+    /**
+     * @return array
+     */
+    private static function getConfig():array{
+        if(!isset(self::$config)){
+            self::$config = Option::expandOptions(
+                self::getSettings(),
+                self::getName(),
+                ['serialize' => true, 'single_option' => true]
+            );
+        }
+        return self::$config;
+    }
+
+    /**
+     * @return array
+     */
+    private static function getSettings():array{
+        if(!isset(self::$settings)){
+            self::$settings = [];
+            foreach (self::$integrations as $key => $class) {
+                self::$settings['integrations'][$key] =
+                    new Option(
+                        [
+                            'type' => Option::TYPE_BOOL,
+                            'label' => $class::NAME,
+                            'description' => 'Enable/Disable integration'
+                        ]
+                    );
+            }
+        }
+        return self::$settings;
+    }
 
     public function __construct(Bootstrap $parent)
     {
         $this->parent = $parent;
 
-        foreach ($this->integrations as $key => $class) {
-            $this->settings['integrations'][$key] =
-                new Option(
-                    [
-                        'type' => Option::TYPE_BOOL,
-                        'label' => $class::NAME,
-                        'description' => 'Enable/Disable integration'
-                    ]
-                );
-        }
-
-        $this->config = Option::expandOptions(
-            $this->settings,
-            $this->getName(),
-            ['serialize' => true, 'single_option' => true]
-        );
-
-        foreach ($this->config['integrations'] as $integration => $status) {
+        foreach (self::getConfig()['integrations'] as $integration => $status) {
             if ($status === true) {
-                $class = $this->integrations[$integration] ?? null;
+                $class = self::$integrations[$integration] ?? null;
                 if ($class !== null) {
                     $this->{$integration} = new $class($this);
                 }
@@ -96,7 +116,7 @@ class Integrations
             __('Integrations', 'novembit-spm'),
             __('Integrations', 'novembit-spm'),
             'manage_options',
-            $this->getName(),
+            self::getName(),
             [$this, 'adminContent']
         );
     }
@@ -109,8 +129,8 @@ class Integrations
     public function adminContent(): void
     {
         Option::printForm(
-            $this->getName(),
-            $this->settings,
+            self::getName(),
+            self::getSettings(),
             [
                 'title' => 'Smart Plugin Manager - Integrations',
                 'ajax_submit' => true,
@@ -124,9 +144,9 @@ class Integrations
     /**
      * @return string
      */
-    public function getName(): string
+    public static function getName(): string
     {
-        return $this->parent::getName() . '-integrations';
+        return Bootstrap::getName() . '-integrations';
     }
 
 }

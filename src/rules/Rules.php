@@ -53,95 +53,6 @@ class Rules
     public $tabs = [];
 
     /**
-     * @var array
-     * */
-    public static $settings;
-
-    /**
-     * @var array
-     * */
-    public static $config;
-
-    /**
-     * @return array|Option[]
-     */
-    public static function getSettings(): array
-    {
-        if (!isset(self::$settings)) {
-            self::$settings = [
-                'plugins' => [
-                    'rules' => new Option(
-                        [
-                            'default' => false,
-                            'type' => Option::TYPE_BOOL,
-                            'label' => 'Rules',
-                            'description' => 'Each plugin can have custom specific rules.'
-                        ]
-                    ),
-                    'filters' => new Option(
-                        [
-                            'default' => true,
-                            'type' => Option::TYPE_BOOL,
-                            'label' => 'Filters',
-                            'description' => 'Each plugin can have custom specific filters.'
-                        ]
-                    )
-                ],
-                'filters' => [
-                    'active' => new Option(
-                        [
-                            'default' => true,
-                            'type' => Option::TYPE_BOOL,
-                            'label' => 'Enable filters',
-                            'description' => 'Enable filters system.'
-                        ]
-                    )
-                ],
-                'patterns' => [
-                    'active' => new Option(
-                        [
-                            'default' => true,
-                            'type' => Option::TYPE_BOOL,
-                            'label' => 'Enable filters',
-                            'description' => 'Enable filters system.'
-                        ]
-                    ),
-                    'include_wp_rewrite_rules_as_patterns' => new Option(
-                        [
-                            'default' => false,
-                            'type' => Option::TYPE_BOOL,
-                            'label' => 'Include WordPress rewrite rules as patterns',
-                            'description' => HTML::tag(
-                                'div',
-                                [
-                                    ['span', 'Include WordPress rewrite rules as patterns.'],
-                                    ['h4', 'In plugins filters field filter names starting with RR']
-                                ]
-                            )
-                        ]
-                    ),
-                ]
-            ];
-        }
-        return self::$settings;
-    }
-
-    /**
-     * @return array
-     */
-    public static function getConfig(): array
-    {
-        if (!isset(self::$config)) {
-            self::$config = Option::expandOptions(
-                self::getSettings(),
-                self::getName(),
-                ['serialize' => true, 'single_option' => true]
-            );
-        }
-        return self::$config;
-    }
-
-    /**
      * Filters constructor.
      * @param Bootstrap $parent
      */
@@ -189,7 +100,8 @@ class Rules
             [$this, 'adminContent']
         );
 
-        $this->tabs['default'] = ['label' => 'Rules', 'content' => [$this, 'defaultTabContent']];
+        $this->tabs['default'] = ['label' => 'General', 'content' => [$this, 'defaultTabContent']];
+        $this->tabs = apply_filters(self::getName() . '-tabs', $this->tabs);
     }
 
     /**
@@ -233,15 +145,7 @@ class Rules
      */
     public function defaultTabContent(): void
     {
-        Option::printForm(
-            self::getName(),
-            self::getSettings(),
-            [
-                'title' => 'Rules configuration',
-                'serialize' => true,
-                'single_option' => true
-            ]
-        );
+        echo "<h1>Rules</h1>";
     }
 
     /**

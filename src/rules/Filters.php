@@ -43,7 +43,6 @@ class Filters
                         'method' => Option::METHOD_MULTIPLE,
                         'type' => Option::TYPE_GROUP,
                         'values' => [],
-                        'main_params' => ['col' => 2],
                         'before_set_value' => static function (Option $option, &$value) {
                             $map = Option::getOption(Plugins::filtersRelationMapName(), Bootstrap::getName(), [], true);
                             foreach ($value as $group) {
@@ -74,12 +73,18 @@ class Filters
                                 }
                             }
                         },
+                        'main_params' => ['col' => 2],
+
                         'template' => [
                             'name' => [
                                 'label' => 'Name',
                                 'type' => Option::TYPE_TEXT,
                                 'required' => true,
-                                'main_params' => ['col' => 1]
+                                'main_params' => static function (array $params) {
+                                    $_params['col'] = 1;
+                                    $_params['id'] = 'filter-' . ($params['value'] ?? 'none');
+                                    return $_params;
+                                },
                             ],
                             'label' => [
                                 'label' => 'Label',
@@ -179,7 +184,10 @@ class Filters
             $filter = $this->getFilter($filter_name);
 
             if (
-                (isset($filter['rules']) && $this->parent->checkRules($filter['rules'], $verbose[$filter_name]['rules'])) ||
+                (isset($filter['rules']) && $this->parent->checkRules(
+                        $filter['rules'],
+                        $verbose[$filter_name]['rules']
+                    )) ||
                 (isset($filter['patterns']) && $this->parent->patterns->checkPatterns(
                         $filter['patterns'],
                         $verbose[$filter_name]['patterns']
@@ -220,7 +228,7 @@ class Filters
     /**
      * @return array
      */
-    public function getFiltersMap(): array
+    public static function getFiltersMap(): array
     {
         $list = [];
         foreach (self::getFilters() as $filter) {
@@ -246,7 +254,7 @@ class Filters
      */
     public function adminInit(): void
     {
-        add_action('admin_menu', [$this, 'adminMenu'], 11);
+        add_action('admin_menu', [$this, 'adminMenu']);
     }
 
     /**
@@ -255,7 +263,13 @@ class Filters
      */
     public function adminMenu(): void
     {
-        $this->parent->tabs['filters'] = ['label' => 'Filters', 'content' => [$this, 'tabContent']];
+        add_filter(
+            Rules::getName() . '-tabs',
+            function ($tabs) {
+                $tabs['filters'] = ['label' => 'Filters', 'content' => [$this, 'tabContent']];
+                return $tabs;
+            }
+        ,10);
     }
 
     /**

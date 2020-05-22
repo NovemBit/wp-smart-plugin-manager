@@ -17,11 +17,18 @@ class Helpers
         'RequestUri'
     ];
 
+    /**
+     * @return string
+     */
     public static function getName(): string
     {
         return Bootstrap::getName() . '-helpers';
     }
 
+    /**
+     * @param string $helper
+     * @return string
+     */
     public function getHookName(string $helper): string
     {
         return self::getName() . '-' . $helper;
@@ -37,16 +44,26 @@ class Helpers
         }
     }
 
+    /**
+     * @return string
+     */
     public function callbackRequestPath():string
     {
         return parse_url(Environment::server('REQUEST_URI'), PHP_URL_PATH);
     }
 
+    /**
+     * @return string
+     */
     public function callbackRequestUri():string
     {
         return Environment::server('REQUEST_URI');
     }
 
+    /**
+     * Helpers constructor.
+     * @param Bootstrap $parent
+     */
     public function __construct(Bootstrap $parent)
     {
         $this->parent = $parent;

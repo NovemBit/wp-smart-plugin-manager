@@ -11,6 +11,7 @@ use diazoxide\wp\lib\option\v2\Option;
 use Exception;
 use NovemBit\wp\plugins\spm\Bootstrap;
 use NovemBit\wp\plugins\spm\rules\Filters;
+use NovemBit\wp\plugins\spm\rules\Patterns;
 use NovemBit\wp\plugins\spm\rules\Rules;
 
 /**
@@ -63,6 +64,10 @@ class Plugins
             $plugins = Bootstrap::getAllPlugins();
 
             foreach ($plugins as $file => $plugin_data) {
+//                if (Bootstrap::coreDeactivatedPlugins() && !Bootstrap::isPluginActive($file)) {
+//                    continue;
+//                }
+
                 add_filter(
                     'wp-lib-option/' . self::getName() . '/form-nested-label',
                     [self::class, 'setNestedFieldName'],
@@ -81,7 +86,8 @@ class Plugins
                 unset($plugins_list[$file]);
                 self::$settings[$file] = [
                     'name' => $plugin_data['Name'] ?? $file,
-                    'filters' => new Option(
+                    'data' => $plugin_data,
+                    'filters' => Bootstrap::isActivePluginFilters() ? new Option(
                         [
                             'label' => 'Filters',
                             'method' => Option::METHOD_MULTIPLE,
@@ -129,8 +135,8 @@ class Plugins
                             },
                             'main_params' => ['col' => 1],
                         ]
-                    ),
-                    'rules' => new Option(
+                    ) : [],
+                    'rules' => Bootstrap::isActivePluginRules() ? new Option(
                         [
                             'default' => [],
                             'method' => Option::METHOD_MULTIPLE,
@@ -140,7 +146,7 @@ class Plugins
                             'template' => Rules::getRulesSettings(),
                             'label' => 'Rules'
                         ]
-                    ),
+                    ) : [],
                 ];
             }
 
@@ -184,8 +190,9 @@ class Plugins
     public function __construct(Bootstrap $parent)
     {
         $this->parent = $parent;
-        add_action('init', [$this, 'handleRequestActions']);
+
         $this->initActivePlugins();
+
         /**
          * @uses adminBarMenu
          * */
@@ -213,17 +220,6 @@ class Plugins
                 ),
             )
         );
-    }
-
-    /**
-     * Is Plugin activated from Core
-     *
-     * @param string $plugin
-     * @return bool
-     */
-    private function isPluginActive(string $plugin): bool
-    {
-        return Bootstrap::getAllPlugins()[$plugin]['custom_data']['is_active'] ?? false;
     }
 
     /**
@@ -281,14 +277,7 @@ class Plugins
             return;
         }
 
-
-        $config = self::getConfig();
-
-        foreach ($config as $plugin => $data) {
-            if (!Bootstrap::isPluginActive($plugin)) {
-                continue;
-            }
-
+        foreach (self::getConfig() as $plugin => $data) {
             $rules = array_values($data['rules'] ?? []);
             $filters = array_values($data['filters'] ?? []);
 
@@ -300,15 +289,11 @@ class Plugins
             }
         }
 
-        echo '<!-- DEBUG' . PHP_EOL;
-        var_dump($this->verbose);
-        echo 'DEBUG -->';
-
         if (
             ($this->parent::getConfig()['debug']['active'] ?? false) &&
             ($this->parent::getConfig()['debug']['plugins_on_admin_bar'] ?? false)
         ) {
-            foreach (Bootstrap::getAllPlugins() as $plugin => $params) {
+            foreach (self::getConfig() as $plugin => $params) {
                 $status = Environment::get(self::getPluginHash($plugin));
                 if (($status === '0') && in_array($plugin, $this->active_plugins, true)) {
                     unset($this->active_plugins[array_search($plugin, $this->active_plugins, true)]);
@@ -316,7 +301,6 @@ class Plugins
                     $this->active_plugins[] = $plugin;
                 }
             }
-
             /**
              * @uses adminToolbar
              * */
@@ -372,9 +356,11 @@ class Plugins
     public function adminBarPlugins(): void
     {
         global $wp_admin_bar;
-        foreach (Bootstrap::getAllPlugins() as $plugin => $data) {
+        foreach (self::getConfig() as $plugin => $data) {
+            //$core_active = in_array($plugin, $this->orig_active_plugins, true);
             $active = in_array($plugin, $this->active_plugins, true);
-            $title = Bootstrap::getAllPlugins()[$plugin]['Name'] ?? $plugin;
+
+            $title = self::getConfig()[$plugin]['data']['Name'] ?? $plugin;
 
             $hash = self::getPluginHash($plugin);
             $url = URL::removeQueryVars(URL::getCurrent(), $hash);
@@ -395,31 +381,55 @@ class Plugins
                 ]
             );
 
-
             if (!$active) {
-                foreach ($this->verbose[$plugin] as $type => $verbose) {
-//                    if ($type === 'rules') {
-//                        continue;
-//                    }
+                if (!empty($this->verbose[$plugin]['rules'])) {
                     $wp_admin_bar->add_node(
                         [
-                            'id' => self::getName() . '-' . $hash . '-' . $type,
+                            'id' => self::getName() . '-' . $hash . '-rules',
                             'parent' => self::getName() . '-' . $hash,
-                            'title' => HTML::tag('span',ucfirst($type),['style'=>'color:orange']),
-                            'href' => '#'
+                            'title' => HTML::tag(
+                                'span',
+                                [
+                                    ['span', 'Custom rules', ['style' => 'color:green']]
+                                ]
+                            ),
+                            'href' => admin_url('admin.php?page=smart-plugin-manager-plugins#' . $plugin)
                         ]
                     );
-
-                    foreach ($this->verbose[$plugin][$type] ?? [] as $filter_name => $filter_verbose) {
+                } elseif (!empty($this->verbose[$plugin]['filters'])) {
+                    foreach ($this->verbose[$plugin]['filters'] as $name => $_verbose) {
+                        $label = Filters::getFiltersMap()[$name];
                         $wp_admin_bar->add_node(
                             [
-                                'id' => self::getName() . '-' . $hash . '-' . $type . '-' . $filter_name,
+                                'id' => self::getName() . '-' . $hash . '-filters-' . $name,
                                 'parent' => self::getName() . '-' . $hash,
-                                'title' => $filter_name,
-                                'href' => '#'
+                                'title' => HTML::tag(
+                                    'span',
+                                    [
+                                        ['span', 'Filters - ', ['style' => 'color:green']],
+                                        ['span', $label, ['style' => 'color:orange']],
+                                    ]
+                                ),
+                                'href' => admin_url(
+                                    'admin.php?page=smart-plugin-manager-rules&sub-action=filters#filter-' . $name
+                                )
                             ]
                         );
                     }
+                } else {
+                    $wp_admin_bar->add_node(
+                        [
+                            'id' => self::getName() . '-' . $hash . '-temporary',
+                            'parent' => self::getName() . '-' . $hash,
+                            'title' => HTML::tag(
+                                'span',
+                                [
+                                    ['span', 'Temporary deactivated (activate)', ['style' => 'color:red']]
+                                ]
+                            ),
+                            'href' => $url
+                        ]
+                    );
                 }
             }
         }
@@ -460,7 +470,7 @@ class Plugins
     {
         $html = '';
         foreach ($plugins as $plugin) {
-            $plugin = Bootstrap::getAllPlugins()[$plugin]['Name'] ?? $plugin;
+            $plugin = self::getConfig()[$plugin]['data']['Name'] ?? $plugin;
             $html .= HTML::tag('p', $plugin);
         }
         return $html;
@@ -502,9 +512,9 @@ class Plugins
     public static function setNestedFieldName($label): string
     {
         $plugin = $label;
-        $label = Bootstrap::getAllPlugins()[$plugin]['Name'] ?? $label;
+        $label = self::getConfig()[$plugin]['data']['Name'] ?? $label;
         $label .= ' (';
-        $label .= Bootstrap::getAllPlugins()[$plugin]['Version'] ?? '?';
+        $label .= self::getConfig()[$plugin]['data']['Version'] ?? '?';
         $label .= ') ';
         $label .= self::getPluginActiveStatusBadge($plugin, false);
         return $label;
@@ -518,7 +528,7 @@ class Plugins
     public static function setBeforeNestedFields($content, $route): string
     {
         $html = '';
-        $plugin_data = Bootstrap::getAllPlugins()[$route] ?? null;
+        $plugin_data = self::getConfig()[$route]['data'] ?? null;
         if ($plugin_data) {
             $html .= self::getPluginActions($route);
             $html .= self::getPluginInfo($plugin_data);
@@ -601,6 +611,7 @@ class Plugins
     public function adminInit(): void
     {
         add_action('admin_menu', [$this, 'adminMenu'], 11);
+        add_action('init', [$this, 'handleRequestActions']);
     }
 
     /**

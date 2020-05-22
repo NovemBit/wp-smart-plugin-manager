@@ -7,16 +7,18 @@ namespace NovemBit\wp\plugins\spm\rules;
 use diazoxide\helpers\Arrays;
 use diazoxide\helpers\Variables;
 use diazoxide\wp\lib\option\v2\Option;
-use NovemBit\wp\plugins\spm\system\Component;
+use Exception;
+use NovemBit\wp\plugins\spm\Bootstrap;
 
-/**
- * @property Rules $parent
- * */
 class Patterns
 {
 
     use Registrable;
 
+    /**
+     * @var Rules
+     * */
+    public $parent;
     /**
      * @var array
      * */
@@ -26,7 +28,6 @@ class Patterns
      * @var array
      * */
     public static $config;
-
 
     /**
      * @return array|Option[]
@@ -94,14 +95,16 @@ class Patterns
     public function __construct(Rules $parent)
     {
         $this->parent = $parent;
+
         add_filter(
             'wp-lib-option/' . self::getName() . '/expanded-option',
-            function ($config) {
+            function (array $config) {
                 self::overwriteRegistered($config['patterns'], $this->predefined());
                 self::overwriteRegistered($config['patterns'], $this->getRegistered());
                 return $config;
             }
         );
+
         if (is_admin()) {
             $this->adminInit();
         }
@@ -178,7 +181,7 @@ class Patterns
             ]
         ];
 
-        if (($this->parent::getConfig()['patterns']['include_wp_rewrite_rules_as_patterns'] ?? false)) {
+        if ((Bootstrap::getConfig()['rules']['patterns']['wp_rewrite_rules'] ?? false)) {
             $rewrite_rules = get_option('rewrite_rules', []);
             foreach ($rewrite_rules as $rule => $rewrite) {
                 $generated_patterns[] = [
@@ -209,6 +212,7 @@ class Patterns
 
     /**
      * @param array $patterns
+     * @param array|null $verbose
      * @return bool
      */
     public function checkPatterns(array $patterns, ?array &$verbose = null): bool
@@ -278,7 +282,7 @@ class Patterns
      */
     public function adminInit(): void
     {
-        add_action('admin_menu', [$this, 'adminMenu'], 11);
+        add_action('admin_menu', [$this, 'adminMenu']);
     }
 
     /**
@@ -287,12 +291,19 @@ class Patterns
      */
     public function adminMenu(): void
     {
-        $this->parent->tabs['patterns'] = ['label' => 'Patterns', 'content' => [$this, 'tabContent']];
+        add_filter(
+            Rules::getName() . '-tabs',
+            function ($tabs) {
+                $tabs['patterns'] = ['label' => 'Patterns', 'content' => [$this, 'tabContent']];
+                return $tabs;
+            },
+            11
+        );
     }
 
     /**
      * @return void
-     * @throws \Exception
+     * @throws Exception
      */
     public function tabContent(): void
     {
